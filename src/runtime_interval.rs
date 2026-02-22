@@ -570,6 +570,344 @@ impl RuntimeInterval {
         }
         out
     }
+
+    // ── Phase 5: Squaring, power, FMA ────────────────────────────
+
+    /// Squaring: tighter than mul(self, self).
+    pub fn square(&self) -> (out: Self)
+        requires
+            self.wf_spec(),
+        ensures
+            out@ == self@.square_spec(),
+            out.wf_spec(),
+    {
+        let zero = RuntimeRational::from_int(0i64);
+        let lo_nonneg = zero.le(&self.lo);
+        if lo_nonneg {
+            // entirely nonneg: [lo², hi²]
+            let lo2 = self.lo.mul(&self.lo);
+            let hi2 = self.hi.mul(&self.hi);
+            let ghost iv = self@.square_spec();
+            let out = RuntimeInterval {
+                lo: lo2,
+                hi: hi2,
+                model: Ghost(iv),
+            };
+            proof { Interval::lemma_square_wf(self@); }
+            out
+        } else {
+            let hi_nonpos = self.hi.le(&zero);
+            if hi_nonpos {
+                // entirely nonpos: [hi², lo²]
+                let lo2 = self.lo.mul(&self.lo);
+                let hi2 = self.hi.mul(&self.hi);
+                let ghost iv = self@.square_spec();
+                let out = RuntimeInterval {
+                    lo: hi2,
+                    hi: lo2,
+                    model: Ghost(iv),
+                };
+                proof { Interval::lemma_square_wf(self@); }
+                out
+            } else {
+                // spans zero: [0, max(lo², hi²)]
+                let lo2 = self.lo.mul(&self.lo);
+                let hi2 = self.hi.mul(&self.hi);
+                let hi_out = lo2.max(&hi2);
+                let lo_out = RuntimeRational::from_int(0i64);
+                let ghost iv = self@.square_spec();
+                let out = RuntimeInterval {
+                    lo: lo_out,
+                    hi: hi_out,
+                    model: Ghost(iv),
+                };
+                proof { Interval::lemma_square_wf(self@); }
+                out
+            }
+        }
+    }
+
+    /// Integer power (naive recursive).
+    pub fn pow(&self, n: u64) -> (out: Self)
+        requires
+            self.wf_spec(),
+        ensures
+            out@ == self@.pow_spec(n as nat),
+            out.wf_spec(),
+        decreases n,
+    {
+        if n == 0 {
+            let one = RuntimeRational::from_int(1i64);
+            Self::from_point(&one)
+        } else {
+            let prev = self.pow(n - 1);
+            let result = self.mul(&prev);
+            proof {
+                Interval::lemma_pow_wf(self@, (n - 1) as nat);
+            }
+            result
+        }
+    }
+
+    /// Fused multiply-add: self * mul_rhs + add_rhs.
+    pub fn fma(&self, mul_rhs: &Self, add_rhs: &Self) -> (out: Self)
+        requires
+            self.wf_spec(),
+            mul_rhs.wf_spec(),
+            add_rhs.wf_spec(),
+        ensures
+            out@ == self@.fma_spec(mul_rhs@, add_rhs@),
+            out.wf_spec(),
+    {
+        let product = self.mul(mul_rhs);
+        product.add(add_rhs)
+    }
+    // ── Phase 6: Subdivision & splitting ─────────────────────────
+
+    /// Bisect at midpoint: returns ([lo, mid], [mid, hi]).
+    pub fn bisect(&self) -> (out: (Self, Self))
+        requires
+            self.wf_spec(),
+        ensures
+            out.0@ == self@.bisect_spec().0,
+            out.1@ == self@.bisect_spec().1,
+            out.0.wf_spec(),
+            out.1.wf_spec(),
+    {
+        let mid = self.lo.midpoint(&self.hi);
+        proof {
+            Interval::lemma_bisect_wf(self@);
+        }
+        // Copy mid for the right half
+        let mid_copy = RuntimeRational {
+            numerator: mid.numerator.copy_small_total(),
+            denominator: mid.denominator.copy_small_total(),
+            model: Ghost(mid@),
+        };
+        // Copy lo for the left half
+        let lo_copy = RuntimeRational {
+            numerator: self.lo.numerator.copy_small_total(),
+            denominator: self.lo.denominator.copy_small_total(),
+            model: Ghost(self@.lo),
+        };
+        // Copy hi for the right half
+        let hi_copy = RuntimeRational {
+            numerator: self.hi.numerator.copy_small_total(),
+            denominator: self.hi.denominator.copy_small_total(),
+            model: Ghost(self@.hi),
+        };
+        let left = RuntimeInterval {
+            lo: lo_copy,
+            hi: mid,
+            model: Ghost(self@.bisect_spec().0),
+        };
+        let right = RuntimeInterval {
+            lo: mid_copy,
+            hi: hi_copy,
+            model: Ghost(self@.bisect_spec().1),
+        };
+        (left, right)
+    }
+
+    /// Split at an arbitrary rational point p where lo ≤ p ≤ hi.
+    pub fn split_at(&self, p: &RuntimeRational) -> (out: (Self, Self))
+        requires
+            self.wf_spec(),
+            p.wf_spec(),
+            self@.contains_spec(p@),
+        ensures
+            out.0@ == self@.split_at_spec(p@).0,
+            out.1@ == self@.split_at_spec(p@).1,
+            out.0.wf_spec(),
+            out.1.wf_spec(),
+    {
+        proof {
+            Interval::lemma_split_at_wf(self@, p@);
+        }
+        // Copy p for both halves
+        let p_copy1 = RuntimeRational {
+            numerator: p.numerator.copy_small_total(),
+            denominator: p.denominator.copy_small_total(),
+            model: Ghost(p@),
+        };
+        let p_copy2 = RuntimeRational {
+            numerator: p.numerator.copy_small_total(),
+            denominator: p.denominator.copy_small_total(),
+            model: Ghost(p@),
+        };
+        // Copy endpoints
+        let lo_copy = RuntimeRational {
+            numerator: self.lo.numerator.copy_small_total(),
+            denominator: self.lo.denominator.copy_small_total(),
+            model: Ghost(self@.lo),
+        };
+        let hi_copy = RuntimeRational {
+            numerator: self.hi.numerator.copy_small_total(),
+            denominator: self.hi.denominator.copy_small_total(),
+            model: Ghost(self@.hi),
+        };
+        let left = RuntimeInterval {
+            lo: lo_copy,
+            hi: p_copy1,
+            model: Ghost(self@.split_at_spec(p@).0),
+        };
+        let right = RuntimeInterval {
+            lo: p_copy2,
+            hi: hi_copy,
+            model: Ghost(self@.split_at_spec(p@).1),
+        };
+        (left, right)
+    }
+    // ── Phase 7: Scalar root-finding support ────────────────────
+
+    /// Check if two function values indicate a sign change.
+    pub fn has_sign_change(f_lo: &RuntimeRational, f_hi: &RuntimeRational) -> (out: bool)
+        requires
+            f_lo.wf_spec(),
+            f_hi.wf_spec(),
+        ensures
+            out == Interval::sign_change_spec(f_lo@, f_hi@),
+    {
+        let s_lo = f_lo.signum();
+        let s_hi = f_hi.signum();
+        (s_lo == 1i8 && s_hi == -1i8) || (s_lo == -1i8 && s_hi == 1i8)
+    }
+
+    /// Scalar interval Newton step: N(X) = x_mid - f(x_mid)/f'(X) ∩ X.
+    /// Returns None if f'(X) contains zero or intersection is empty.
+    pub fn scalar_newton_step(
+        fx_mid: &RuntimeRational,
+        fprime_interval: &Self,
+        x_mid: &RuntimeRational,
+        x_interval: &Self,
+    ) -> (out: Option<Self>)
+        requires
+            fx_mid.wf_spec(),
+            fprime_interval.wf_spec(),
+            x_mid.wf_spec(),
+            x_interval.wf_spec(),
+        ensures
+            match out {
+                Some(iv) => {
+                    Interval::scalar_newton_step_spec(fx_mid@, fprime_interval@, x_mid@, x_interval@)
+                        == Some(iv@)
+                    && iv.wf_spec()
+                },
+                None => {
+                    Interval::scalar_newton_step_spec(fx_mid@, fprime_interval@, x_mid@, x_interval@)
+                        .is_none()
+                },
+            },
+    {
+        if fprime_interval.possibly_zero() {
+            return None;
+        }
+        let fx_point = Self::from_point(fx_mid);
+        let x_point = Self::from_point(x_mid);
+        // div always succeeds since !possibly_zero
+        let quotient = fx_point.div(fprime_interval).unwrap();
+        let candidate = x_point.sub(&quotient);
+        candidate.intersect(x_interval)
+    }
+
+    /// Interval Horner evaluation for a polynomial with given coefficients.
+    /// coeffs_view maps indices to the ghost Rational values.
+    /// Recursively evaluates c₀ + X*(c₁ + X*(c₂ + ...)).
+    pub fn horner_eval(coeffs: &Vec<RuntimeRational>, x: &Self) -> (out: Self)
+        requires
+            x.wf_spec(),
+            forall|i: int| 0 <= i < coeffs@.len() ==> (#[trigger] coeffs@[i]).wf_spec(),
+        ensures
+            out@ == Interval::horner_eval_spec(
+                Seq::new(coeffs@.len() as nat, |i: int| coeffs@[i]@),
+                x@),
+            out.wf_spec(),
+        decreases coeffs.len(),
+    {
+        let ghost coeffs_seq = Seq::new(coeffs@.len() as nat, |i: int| coeffs@[i]@);
+        if coeffs.len() == 0 {
+            let zero = RuntimeRational::from_int(0i64);
+            proof {
+                Interval::lemma_from_point_wf(Rational::from_int_spec(0));
+            }
+            Self::from_point(&zero)
+        } else {
+            // c0 as point interval
+            let c0 = &coeffs[0];
+            let c0_iv = Self::from_point(c0);
+
+            // Build the rest of coefficients as a new Vec
+            let mut rest_vec: Vec<RuntimeRational> = Vec::new();
+            let mut i: usize = 1;
+            while i < coeffs.len()
+                invariant
+                    1 <= i <= coeffs.len(),
+                    rest_vec@.len() == (i - 1) as int,
+                    forall|j: int| 0 <= j < rest_vec@.len() ==>
+                        (#[trigger] rest_vec@[j]).wf_spec()
+                        && rest_vec@[j]@ == coeffs@[j + 1]@,
+                    forall|j: int| 0 <= j < coeffs@.len() ==> (#[trigger] coeffs@[j]).wf_spec(),
+                decreases coeffs.len() - i,
+            {
+                let ci = RuntimeRational {
+                    numerator: coeffs[i].numerator.copy_small_total(),
+                    denominator: coeffs[i].denominator.copy_small_total(),
+                    model: Ghost(coeffs@[i as int]@),
+                };
+                rest_vec.push(ci);
+                i = i + 1;
+            }
+
+            // Recursive call on rest
+            let inner = Self::horner_eval(&rest_vec, x);
+
+            // X * inner
+            let product = x.mul(&inner);
+
+            // c0 + X * inner
+            let result = c0_iv.add(&product);
+
+            proof {
+                // Show rest_vec's ghost seq matches subrange
+                let ghost rest_seq = Seq::new(rest_vec@.len() as nat, |i: int| rest_vec@[i]@);
+                let ghost expected_rest = coeffs_seq.subrange(1, coeffs_seq.len() as int);
+                assert(rest_seq.len() == expected_rest.len());
+                assert forall|j: int| 0 <= j < rest_seq.len()
+                    implies #[trigger] rest_seq[j] == expected_rest[j]
+                by {
+                    assert(rest_vec@[j]@ == coeffs@[j + 1]@);
+                    assert(rest_seq[j] == rest_vec@[j]@);
+                    assert(expected_rest[j] == coeffs_seq[j + 1]);
+                    assert(coeffs_seq[j + 1] == coeffs@[j + 1]@);
+                }
+                assert(rest_seq =~= expected_rest);
+
+                Interval::lemma_horner_eval_wf(rest_seq, x@);
+                Interval::lemma_mul_wf(x@, Interval::horner_eval_spec(rest_seq, x@));
+                Interval::lemma_from_point_wf(coeffs@[0]@);
+                Interval::lemma_add_wf(
+                    Interval::from_point_spec(coeffs@[0]@),
+                    x@.mul_spec(Interval::horner_eval_spec(rest_seq, x@)));
+            }
+
+            result
+        }
+    }
+
+    // ── Phase 8: Distance & Metric ──
+
+    pub fn hausdorff(&self, other: &Self) -> (out: RuntimeRational)
+        requires
+            self.wf_spec(),
+            other.wf_spec(),
+        ensures
+            out@ == self@.hausdorff_spec(other@),
+            out.wf_spec(),
+    {
+        let d_lo = self.lo.sub(&other.lo).abs();
+        let d_hi = self.hi.sub(&other.hi).abs();
+        d_lo.max(&d_hi)
+    }
 }
 
 impl View for RuntimeInterval {

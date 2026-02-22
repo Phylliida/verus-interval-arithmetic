@@ -171,6 +171,49 @@ impl Interval {
         }
     }
 
+    // ── Special-case operation spec functions ───────────────────
+
+    /// Squaring: tighter than mul(a, a) because it exploits x² ≥ 0.
+    pub open spec fn square_spec(self) -> Interval {
+        let zero = Rational::from_int_spec(0);
+        if zero.le_spec(self.lo) {
+            // entirely nonneg: [lo², hi²]
+            Interval {
+                lo: self.lo.mul_spec(self.lo),
+                hi: self.hi.mul_spec(self.hi),
+            }
+        } else if self.hi.le_spec(zero) {
+            // entirely nonpos: [hi², lo²]
+            Interval {
+                lo: self.hi.mul_spec(self.hi),
+                hi: self.lo.mul_spec(self.lo),
+            }
+        } else {
+            // spans zero: [0, max(lo², hi²)]
+            Interval {
+                lo: zero,
+                hi: self.lo.mul_spec(self.lo).max_spec(
+                    self.hi.mul_spec(self.hi)),
+            }
+        }
+    }
+
+    /// Integer power: [a,b]^n (naive recursive via mul for simplicity).
+    pub open spec fn pow_spec(self, n: nat) -> Interval
+        decreases n,
+    {
+        if n == 0 {
+            Self::from_point_spec(Rational::from_int_spec(1))
+        } else {
+            self.mul_spec(self.pow_spec((n - 1) as nat))
+        }
+    }
+
+    /// Fused multiply-add: a*b + c (no intermediate interval rounding).
+    pub open spec fn fma_spec(self, mul_rhs: Interval, add_rhs: Interval) -> Interval {
+        self.mul_spec(mul_rhs).add_spec(add_rhs)
+    }
+
     // ── Interval arithmetic spec functions ───────────────────────
 
     /// Addition: [a,b] + [c,d] = [a+c, b+d].
@@ -1111,6 +1154,248 @@ impl Interval {
             // max = zero, 0 <= x ✓
             assert(zero.max_spec(a.lo) == zero);
         }
+    }
+
+    // ── Phase 5: Squaring, power, FMA proofs ────────────────────
+
+    /// Squaring preserves well-formedness.
+    pub proof fn lemma_square_wf(a: Self)
+        requires
+            a.wf_spec(),
+        ensures
+            a.square_spec().wf_spec(),
+    {
+        let zero = Rational::from_int_spec(0);
+        if zero.le_spec(a.lo) {
+            // nonneg: [lo², hi²]. Need lo² ≤ hi².
+            Rational::lemma_le_mul_nonneg_both(a.lo, a.hi, a.lo, a.hi);
+        } else if a.hi.le_spec(zero) {
+            // nonpos: [hi², lo²]. Need hi² ≤ lo².
+            // 0 ≤ -hi ≤ -lo
+            // a.lo ≤ a.hi ≤ 0, so negate: 0 ≤ -a.hi ≤ -a.lo
+            Rational::lemma_neg_reverses_le(a.lo, a.hi);
+            Rational::lemma_neg_reverses_le(a.hi, zero);
+            // (-hi)² ≤ (-lo)²
+            Rational::lemma_le_mul_nonneg_both(
+                a.hi.neg_spec(), a.lo.neg_spec(),
+                a.hi.neg_spec(), a.lo.neg_spec());
+            // (-t)² eqv t²
+            Self::lemma_neg_mul_neg_eqv(a.hi, a.hi);
+            Self::lemma_neg_mul_neg_eqv(a.lo, a.lo);
+            // hi² eqv (-hi)² ≤ (-lo)² eqv lo²
+            Rational::lemma_eqv_implies_le(
+                a.hi.mul_spec(a.hi),
+                a.hi.neg_spec().mul_spec(a.hi.neg_spec()));
+            Rational::lemma_le_transitive(
+                a.hi.mul_spec(a.hi),
+                a.hi.neg_spec().mul_spec(a.hi.neg_spec()),
+                a.lo.neg_spec().mul_spec(a.lo.neg_spec()));
+            Rational::lemma_eqv_implies_le(
+                a.lo.neg_spec().mul_spec(a.lo.neg_spec()),
+                a.lo.mul_spec(a.lo));
+            Rational::lemma_le_transitive(
+                a.hi.mul_spec(a.hi),
+                a.lo.neg_spec().mul_spec(a.lo.neg_spec()),
+                a.lo.mul_spec(a.lo));
+        } else {
+            // spans zero: [0, max(lo², hi²)]. Need 0 ≤ max(lo², hi²).
+            Rational::lemma_square_le_nonneg(a.lo);
+            Rational::lemma_max_ge_left(
+                a.lo.mul_spec(a.lo), a.hi.mul_spec(a.hi));
+            Rational::lemma_le_transitive(zero,
+                a.lo.mul_spec(a.lo),
+                a.lo.mul_spec(a.lo).max_spec(a.hi.mul_spec(a.hi)));
+        }
+    }
+
+    /// Squaring containment: x in A → x² in square(A).
+    pub proof fn lemma_square_containment(a: Self, x: Rational)
+        requires
+            a.wf_spec(),
+            a.contains_spec(x),
+        ensures
+            a.square_spec().contains_spec(x.mul_spec(x)),
+    {
+        let zero = Rational::from_int_spec(0);
+        let x2 = x.mul_spec(x);
+        if zero.le_spec(a.lo) {
+            // entirely nonneg: 0 ≤ lo ≤ x ≤ hi
+            // lo² ≤ x² ≤ hi²
+            Rational::lemma_le_transitive(zero, a.lo, x);
+            Rational::lemma_le_mul_nonneg_both(a.lo, x, a.lo, x);
+            Rational::lemma_le_mul_nonneg_both(x, a.hi, x, a.hi);
+        } else if a.hi.le_spec(zero) {
+            // entirely nonpos: lo ≤ x ≤ hi ≤ 0
+            // hi² ≤ x² ≤ lo²
+            // Establish 0 ≤ -hi ≤ -x ≤ -lo
+            Rational::lemma_neg_reverses_le(a.lo, x);    // -x ≤ -lo
+            Rational::lemma_neg_reverses_le(x, a.hi);    // -hi ≤ -x
+            Rational::lemma_neg_reverses_le(a.hi, zero);  // 0 ≤ -hi
+            Rational::lemma_le_transitive(x, a.hi, zero); // x ≤ 0
+            Rational::lemma_neg_reverses_le(x, zero);     // 0 ≤ -x
+            // (-hi)² ≤ (-x)² ≤ (-lo)²
+            Rational::lemma_le_mul_nonneg_both(
+                a.hi.neg_spec(), x.neg_spec(),
+                a.hi.neg_spec(), x.neg_spec());
+            Rational::lemma_le_mul_nonneg_both(
+                x.neg_spec(), a.lo.neg_spec(),
+                x.neg_spec(), a.lo.neg_spec());
+            // Transfer via eqv: (-t)² eqv t²
+            Self::lemma_neg_mul_neg_eqv(a.hi, a.hi);
+            Self::lemma_neg_mul_neg_eqv(x, x);
+            Self::lemma_neg_mul_neg_eqv(a.lo, a.lo);
+            // hi² eqv (-hi)² ≤ (-x)² eqv x²
+            Rational::lemma_eqv_implies_le(
+                a.hi.mul_spec(a.hi),
+                a.hi.neg_spec().mul_spec(a.hi.neg_spec()));
+            Rational::lemma_le_transitive(
+                a.hi.mul_spec(a.hi),
+                a.hi.neg_spec().mul_spec(a.hi.neg_spec()),
+                x.neg_spec().mul_spec(x.neg_spec()));
+            Rational::lemma_eqv_implies_le(
+                x.neg_spec().mul_spec(x.neg_spec()),
+                x.mul_spec(x));
+            Rational::lemma_le_transitive(
+                a.hi.mul_spec(a.hi),
+                x.neg_spec().mul_spec(x.neg_spec()),
+                x2);
+            // x² eqv (-x)² ≤ (-lo)² eqv lo²
+            Rational::lemma_eqv_symmetric(
+                x.neg_spec().mul_spec(x.neg_spec()), x2);
+            Rational::lemma_eqv_implies_le(
+                x2, x.neg_spec().mul_spec(x.neg_spec()));
+            Rational::lemma_le_transitive(
+                x2,
+                x.neg_spec().mul_spec(x.neg_spec()),
+                a.lo.neg_spec().mul_spec(a.lo.neg_spec()));
+            Rational::lemma_eqv_implies_le(
+                a.lo.neg_spec().mul_spec(a.lo.neg_spec()),
+                a.lo.mul_spec(a.lo));
+            Rational::lemma_le_transitive(
+                x2,
+                a.lo.neg_spec().mul_spec(a.lo.neg_spec()),
+                a.lo.mul_spec(a.lo));
+        } else {
+            // spans zero: square = [0, max(lo², hi²)]
+            // 0 ≤ x²
+            Rational::lemma_square_le_nonneg(x);
+            // x² ≤ max(lo², hi²): case split on sign of x
+            Rational::lemma_trichotomy(zero, x);
+            if zero.le_spec(x) {
+                // 0 ≤ x ≤ hi → x² ≤ hi²
+                Rational::lemma_le_mul_nonneg_both(x, a.hi, x, a.hi);
+                Rational::lemma_max_ge_right(
+                    a.lo.mul_spec(a.lo), a.hi.mul_spec(a.hi));
+                Rational::lemma_le_transitive(x2,
+                    a.hi.mul_spec(a.hi),
+                    a.lo.mul_spec(a.lo).max_spec(a.hi.mul_spec(a.hi)));
+            } else {
+                // x < 0 → -x > 0, lo ≤ x → -x ≤ -lo, so 0 < -x ≤ -lo
+                Rational::lemma_lt_implies_le(x, zero);
+                Rational::lemma_neg_reverses_le(x, zero);
+                Rational::lemma_neg_reverses_le(a.lo, x);
+                // (-x)² ≤ (-lo)²
+                Rational::lemma_le_mul_nonneg_both(
+                    x.neg_spec(), a.lo.neg_spec(),
+                    x.neg_spec(), a.lo.neg_spec());
+                // eqv transfer: x² ≤ lo²
+                Self::lemma_neg_mul_neg_eqv(x, x);
+                Self::lemma_neg_mul_neg_eqv(a.lo, a.lo);
+                Rational::lemma_eqv_symmetric(
+                    x.neg_spec().mul_spec(x.neg_spec()), x2);
+                Rational::lemma_eqv_implies_le(
+                    x2, x.neg_spec().mul_spec(x.neg_spec()));
+                Rational::lemma_le_transitive(x2,
+                    x.neg_spec().mul_spec(x.neg_spec()),
+                    a.lo.neg_spec().mul_spec(a.lo.neg_spec()));
+                Rational::lemma_eqv_implies_le(
+                    a.lo.neg_spec().mul_spec(a.lo.neg_spec()),
+                    a.lo.mul_spec(a.lo));
+                Rational::lemma_le_transitive(x2,
+                    a.lo.neg_spec().mul_spec(a.lo.neg_spec()),
+                    a.lo.mul_spec(a.lo));
+                Rational::lemma_max_ge_left(
+                    a.lo.mul_spec(a.lo), a.hi.mul_spec(a.hi));
+                Rational::lemma_le_transitive(x2,
+                    a.lo.mul_spec(a.lo),
+                    a.lo.mul_spec(a.lo).max_spec(a.hi.mul_spec(a.hi)));
+            }
+        }
+    }
+
+    /// Power preserves well-formedness.
+    pub proof fn lemma_pow_wf(a: Self, n: nat)
+        requires
+            a.wf_spec(),
+        ensures
+            a.pow_spec(n).wf_spec(),
+        decreases n,
+    {
+        if n == 0 {
+            Self::lemma_from_point_wf(Rational::from_int_spec(1));
+        } else {
+            Self::lemma_pow_wf(a, (n - 1) as nat);
+            Self::lemma_mul_wf(a, a.pow_spec((n - 1) as nat));
+        }
+    }
+
+    /// Power containment: x in A → x^n in pow(A, n).
+    pub proof fn lemma_pow_containment(a: Self, x: Rational, n: nat)
+        requires
+            a.wf_spec(),
+            a.contains_spec(x),
+        ensures
+            a.pow_spec(n).contains_spec(x.pow_spec(n)),
+        decreases n,
+    {
+        if n == 0 {
+            // x^0 = 1, pow(a,0) = [1,1]. 1 is in [1,1].
+            Rational::lemma_eqv_reflexive(Rational::from_int_spec(1));
+        } else {
+            // x^n = x * x^(n-1). By IH, x^(n-1) in pow(a, n-1).
+            Self::lemma_pow_wf(a, (n - 1) as nat);
+            Self::lemma_pow_containment(a, x, (n - 1) as nat);
+            Self::lemma_mul_containment(a, a.pow_spec((n - 1) as nat),
+                x, x.pow_spec((n - 1) as nat));
+        }
+    }
+
+    // NOTE: lemma_pow_even_nonneg is NOT provable for the naive recursive
+    // pow_spec (due to the dependency problem in interval arithmetic).
+    // Use square_spec directly when tight even-power bounds are needed.
+
+    /// FMA well-formedness: wf(a) ∧ wf(b) ∧ wf(c) → wf(fma(a,b,c)).
+    pub proof fn lemma_fma_wf(a: Self, b: Self, c: Self)
+        requires
+            a.wf_spec(),
+            b.wf_spec(),
+            c.wf_spec(),
+        ensures
+            a.fma_spec(b, c).wf_spec(),
+    {
+        Self::lemma_mul_wf(a, b);
+        Self::lemma_add_wf(a.mul_spec(b), c);
+    }
+
+    /// FMA containment: x in A, y in B, z in C → x*y+z in fma(A,B,C).
+    pub proof fn lemma_fma_containment(
+        a: Self, b: Self, c: Self,
+        x: Rational, y: Rational, z: Rational)
+        requires
+            a.wf_spec(),
+            b.wf_spec(),
+            c.wf_spec(),
+            a.contains_spec(x),
+            b.contains_spec(y),
+            c.contains_spec(z),
+        ensures
+            a.fma_spec(b, c).contains_spec(
+                x.mul_spec(y).add_spec(z)),
+    {
+        Self::lemma_mul_wf(a, b);
+        Self::lemma_mul_containment(a, b, x, y);
+        Self::lemma_add_containment(a.mul_spec(b), c,
+            x.mul_spec(y), z);
     }
 
     // ── Min4 / Max4 helpers ──────────────────────────────────────
@@ -2250,6 +2535,1091 @@ impl Interval {
             Rational::lemma_max_ge_left(sa, sb);
             Rational::lemma_le_transitive(sx, sa, sa.max_spec(sb));
         }
+    }
+    // ── Phase 6: Subdivision & splitting ─────────────────────────
+
+    /// Bisect at midpoint: returns ([lo, mid], [mid, hi]).
+    pub open spec fn bisect_spec(self) -> (Interval, Interval) {
+        let mid = self.midpoint_spec();
+        (
+            Interval { lo: self.lo, hi: mid },
+            Interval { lo: mid, hi: self.hi },
+        )
+    }
+
+    /// Split at an arbitrary rational point p in [lo, hi].
+    pub open spec fn split_at_spec(self, p: Rational) -> (Interval, Interval) {
+        (
+            Interval { lo: self.lo, hi: p },
+            Interval { lo: p, hi: self.hi },
+        )
+    }
+
+    /// N-way uniform subdivision: n equal-width pieces.
+    /// Piece k = [lo + k*(hi-lo)/n, lo + (k+1)*(hi-lo)/n].
+    pub open spec fn subdivide_point_spec(self, n: nat, k: nat) -> Rational
+        recommends n > 0, k <= n,
+    {
+        // lo + k * (hi - lo) / n
+        let w = self.hi.sub_spec(self.lo);
+        let step = w.mul_spec(Rational::from_frac_spec(k as int, n as int));
+        self.lo.add_spec(step)
+    }
+
+    pub open spec fn subdivide_piece_spec(self, n: nat, k: nat) -> Interval
+        recommends n > 0, k < n,
+    {
+        Interval {
+            lo: self.subdivide_point_spec(n, k),
+            hi: self.subdivide_point_spec(n, (k + 1) as nat),
+        }
+    }
+
+    // ── Phase 6 proofs ────────────────────────────────────────────
+
+    /// Both halves of a bisection are well-formed.
+    pub proof fn lemma_bisect_wf(a: Self)
+        requires
+            a.wf_spec(),
+        ensures
+            a.bisect_spec().0.wf_spec(),
+            a.bisect_spec().1.wf_spec(),
+    {
+        let mid = a.midpoint_spec();
+        Rational::lemma_interval_contains_midpoint(a.lo, a.hi);
+        // lo ≤ mid and mid ≤ hi
+    }
+
+    /// Bisection covers: x in a → x in left or x in right.
+    pub proof fn lemma_bisect_covers(a: Self, x: Rational)
+        requires
+            a.wf_spec(),
+            a.contains_spec(x),
+        ensures
+            a.bisect_spec().0.contains_spec(x)
+            || a.bisect_spec().1.contains_spec(x),
+    {
+        let mid = a.midpoint_spec();
+        Rational::lemma_interval_contains_midpoint(a.lo, a.hi);
+        Rational::lemma_trichotomy(x, mid);
+        if x.le_spec(mid) {
+            // x in left = [lo, mid]
+        } else {
+            // mid < x, so mid ≤ x
+            Rational::lemma_lt_implies_le(mid, x);
+            // x in right = [mid, hi]
+        }
+    }
+
+    /// Split at p: both halves are well-formed when lo ≤ p ≤ hi.
+    pub proof fn lemma_split_at_wf(a: Self, p: Rational)
+        requires
+            a.wf_spec(),
+            a.contains_spec(p),
+        ensures
+            a.split_at_spec(p).0.wf_spec(),
+            a.split_at_spec(p).1.wf_spec(),
+    {
+        // lo ≤ p and p ≤ hi directly from contains_spec
+    }
+
+    /// Split covers: x in a → x in left or x in right.
+    pub proof fn lemma_split_covers(a: Self, p: Rational, x: Rational)
+        requires
+            a.wf_spec(),
+            a.contains_spec(p),
+            a.contains_spec(x),
+        ensures
+            a.split_at_spec(p).0.contains_spec(x)
+            || a.split_at_spec(p).1.contains_spec(x),
+    {
+        Rational::lemma_trichotomy(x, p);
+        if x.le_spec(p) {
+            // x in [lo, p]
+        } else {
+            Rational::lemma_lt_implies_le(p, x);
+            // x in [p, hi]
+        }
+    }
+
+    /// Subdivision point 0 equals lo.
+    pub proof fn lemma_subdivide_point_zero(a: Self, n: nat)
+        requires
+            a.wf_spec(),
+            n > 0,
+        ensures
+            a.subdivide_point_spec(n, 0).eqv_spec(a.lo),
+    {
+        // subdivide_point(n, 0) = lo + 0 * w / n = lo + 0
+        let w = a.hi.sub_spec(a.lo);
+        let frac = Rational::from_frac_spec(0, n as int);
+        let step = w.mul_spec(frac);
+        // step.num = w.num * 0 = 0
+        assert(frac.num == 0int);
+        assert(step.num == w.num * frac.num);
+        assert(step.num == 0) by (nonlinear_arith)
+            requires step.num == w.num * 0int;
+
+        let result = a.lo.add_spec(step);
+        // result.num = lo.num * step.denom() + step.num * lo.denom()
+        //            = lo.num * step.denom() + 0 = lo.num * step.denom()
+        Rational::lemma_add_denom_product_int(a.lo, step);
+        // result.denom() == lo.denom() * step.denom()
+
+        // result ≡ lo:
+        // result.num * lo.denom() = lo.num * step.denom() * lo.denom()
+        // lo.num * result.denom() = lo.num * (lo.denom() * step.denom())
+        // Equal by associativity.
+        assert(result.num * a.lo.denom() == a.lo.num * result.denom()) by (nonlinear_arith)
+            requires
+                result.num == a.lo.num * step.denom() + step.num * a.lo.denom(),
+                step.num == 0int,
+                result.denom() == a.lo.denom() * step.denom(),
+        ;
+    }
+
+    /// Subdivision point n equals hi.
+    pub proof fn lemma_subdivide_point_n(a: Self, n: nat)
+        requires
+            a.wf_spec(),
+            n > 0,
+        ensures
+            a.subdivide_point_spec(n, n).eqv_spec(a.hi),
+    {
+        // subdivide_point(n, n) = lo + n * (hi - lo) / n = lo + (hi - lo) = hi
+        let w = a.hi.sub_spec(a.lo);
+        let frac = Rational::from_frac_spec(n as int, n as int);
+        // frac = Rational { num: n, den: n-1 }, so frac ≡ 1
+        let step = w.mul_spec(frac);
+        let result = a.lo.add_spec(step);
+
+        // frac ≡ 1: frac.num * 1.denom() == 1.num * frac.denom()
+        // frac.num = n, frac.denom() = n. 1 = from_int_spec(1) = { num: 1, den: 0 }, denom = 1.
+        // n * 1 == 1 * n. True.
+        let one = Rational::from_int_spec(1);
+        assert(frac.num == n as int);
+        assert(frac.denom() == n as int);
+        assert(frac.num * one.denom() == one.num * frac.denom()) by (nonlinear_arith)
+            requires
+                frac.num == n as int,
+                frac.denom() == n as int,
+                one.num == 1int,
+                one.denom() == 1int,
+                n > 0,
+        ;
+        assert(frac.eqv_spec(one));
+
+        // step = w * frac ≡ w * 1 ≡ w
+        Rational::lemma_eqv_mul_congruence_right(w, frac, one);
+        Rational::lemma_mul_one_identity(w);
+        Rational::lemma_eqv_transitive(step, w.mul_spec(one), w);
+
+        // result = lo + step ≡ lo + w = lo + (hi - lo)
+        Rational::lemma_eqv_add_congruence_right(a.lo, step, w);
+        let lo_plus_w = a.lo.add_spec(w);
+        // result ≡ lo_plus_w
+
+        // lo + (hi - lo) ≡ hi
+        Rational::lemma_sub_then_add_cancel(a.hi, a.lo);
+        // lo_plus_w = lo + (hi - lo) ≡ hi
+        Rational::lemma_eqv_transitive(result, lo_plus_w, a.hi);
+    }
+
+    /// Subdivision points are monotone: k1 ≤ k2 → point(k1) ≤ point(k2).
+    pub proof fn lemma_subdivide_points_monotone(a: Self, n: nat, k1: nat, k2: nat)
+        requires
+            a.wf_spec(),
+            n > 0,
+            k1 <= k2,
+            k2 <= n,
+        ensures
+            a.subdivide_point_spec(n, k1).le_spec(a.subdivide_point_spec(n, k2)),
+    {
+        let w = a.hi.sub_spec(a.lo);
+        let frac1 = Rational::from_frac_spec(k1 as int, n as int);
+        let frac2 = Rational::from_frac_spec(k2 as int, n as int);
+        let step1 = w.mul_spec(frac1);
+        let step2 = w.mul_spec(frac2);
+
+        // frac1 ≤ frac2 since k1/n ≤ k2/n
+        assert(frac1.num == k1 as int);
+        assert(frac2.num == k2 as int);
+        assert(frac1.denom() == n as int);
+        assert(frac2.denom() == n as int);
+        assert(frac1.le_spec(frac2)) by (nonlinear_arith)
+            requires
+                frac1.num == k1 as int,
+                frac2.num == k2 as int,
+                frac1.denom() == n as int,
+                frac2.denom() == n as int,
+                k1 <= k2,
+                n > 0,
+        ;
+
+        // w ≥ 0: hi - lo ≥ 0 from wf
+        Self::lemma_width_nonneg(a);
+
+        // frac1*w ≤ frac2*w (from frac1 ≤ frac2 and w ≥ 0)
+        Rational::lemma_le_mul_nonneg(frac1, frac2, w);
+        // ensures: frac1.mul_spec(w).le_spec(frac2.mul_spec(w))
+        // Since mul_spec is structurally commutative:
+        // frac1.mul_spec(w) == w.mul_spec(frac1) == step1
+        // frac2.mul_spec(w) == w.mul_spec(frac2) == step2
+        Rational::lemma_mul_commutative(frac1, w);
+        Rational::lemma_mul_commutative(frac2, w);
+        // Now we have step1.le_spec(step2)... but le_spec uses eqv after commutative.
+        // Actually lemma_mul_commutative gives structural ==, so step1 == frac1*w.
+        // The le_spec is on frac1*w and frac2*w, and those == step1, step2.
+        // So step1.le_spec(step2) follows.
+
+        // lo + step1 ≤ lo + step2
+        // Use lemma_le_add_both(lo, lo, step1, step2) → lo+step1 ≤ lo+step2
+        Rational::lemma_le_add_both(a.lo, a.lo, step1, step2);
+    }
+
+    /// Subdivision piece is well-formed.
+    pub proof fn lemma_subdivide_piece_wf(a: Self, n: nat, k: nat)
+        requires
+            a.wf_spec(),
+            n > 0,
+            k < n,
+        ensures
+            a.subdivide_piece_spec(n, k).wf_spec(),
+    {
+        Self::lemma_subdivide_points_monotone(a, n, k, (k + 1) as nat);
+    }
+
+    /// Subdivision covers: x in a → x in some piece.
+    pub proof fn lemma_subdivide_covers(a: Self, n: nat, x: Rational)
+        requires
+            a.wf_spec(),
+            n > 0,
+            a.contains_spec(x),
+        ensures
+            exists|k: nat| k < n && a.subdivide_piece_spec(n, k).contains_spec(x),
+        decreases n,
+    {
+        if n == 1 {
+            // Single piece: [lo, hi] = a
+            Self::lemma_subdivide_point_zero(a, 1);
+            Self::lemma_subdivide_point_n(a, 1);
+            let piece = a.subdivide_piece_spec(1, 0);
+            // piece.lo = subdivide_point(1, 0) ≡ lo
+            // piece.hi = subdivide_point(1, 1) ≡ hi
+            // Need: piece.contains_spec(x), i.e., piece.lo ≤ x ≤ piece.hi
+            // From lo ≤ x: subdivide_point(1,0) ≡ lo, so subdivide_point(1,0) ≤ x
+            Rational::lemma_eqv_symmetric(a.subdivide_point_spec(1, 0), a.lo);
+            Rational::lemma_eqv_implies_le(a.lo, a.subdivide_point_spec(1, 0));
+            Rational::lemma_le_transitive(piece.lo, a.lo, x);
+            // From x ≤ hi: x ≤ hi ≡ subdivide_point(1,1)
+            Rational::lemma_eqv_implies_le(a.hi, a.subdivide_point_spec(1, 1));
+            Rational::lemma_le_transitive(x, a.hi, piece.hi);
+            assert(piece.contains_spec(x));
+        } else {
+            // Check if x is in the last piece [point(n-1), point(n)]
+            let last_lo = a.subdivide_point_spec(n, (n - 1) as nat);
+            Rational::lemma_trichotomy(last_lo, x);
+            if last_lo.le_spec(x) {
+                // x in last piece [point(n-1), point(n)]
+                // Need x ≤ point(n)
+                Self::lemma_subdivide_point_n(a, n);
+                Rational::lemma_eqv_implies_le(a.hi, a.subdivide_point_spec(n, n));
+                Rational::lemma_le_transitive(x, a.hi, a.subdivide_point_spec(n, n));
+                let piece = a.subdivide_piece_spec(n, (n - 1) as nat);
+                assert(piece.contains_spec(x));
+            } else {
+                // x < last_lo, so x < point(n-1)
+                // x is in the first (n-1) pieces of a subdivide-by-n.
+                // We need to show x is contained in some piece k < n-1.
+                // point(n-1) corresponds to lo + (n-1)*(hi-lo)/n.
+                // Consider the interval [lo, point(n-1)] — x is in it.
+                // But that's not exactly a sub-subdivision of a.
+
+                // Simpler approach: the first n-1 pieces of subdivide(n) cover [lo, point(n-1)].
+                // x < point(n-1), and lo ≤ x, so x is in [lo, point(n-1)].
+                // By induction on the first n-1 pieces...
+                // Actually let's just check pieces from 0 to n-2.
+                // piece k = [point(k), point(k+1)] for k = 0..n-1
+                // x < point(n-1), x ≥ lo = point(0) (via eqv)
+                // So there exists some k < n-1 where point(k) ≤ x < point(k+1).
+
+                // Use a decreasing search: check piece n-2.
+                // Recursively, x is in [lo, point(n-1)].
+                // But we can't easily recurse on a sub-interval here.
+
+                // Alternative: iterate through pieces.
+                // For Verus proofs, a direct constructive approach with a loop-like
+                // decreasing argument works. Let's use a helper.
+                Rational::lemma_lt_implies_le(x, last_lo);
+                Self::lemma_subdivide_point_zero(a, n);
+                Rational::lemma_eqv_symmetric(a.subdivide_point_spec(n, 0), a.lo);
+                Rational::lemma_eqv_implies_le(a.lo, a.subdivide_point_spec(n, 0));
+                let p0 = a.subdivide_point_spec(n, 0);
+                // lo ≤ point(0) and point(0) ≡ lo, so point(0) ≤ x
+                Rational::lemma_le_transitive(p0, a.lo, x);
+                // x < point(n-1), x ≥ point(0)
+                Self::lemma_subdivide_find_piece(a, n, x, (n - 1) as nat);
+            }
+        }
+    }
+
+    /// Helper: find a piece for x given that point(0) ≤ x < point(j) for some j.
+    proof fn lemma_subdivide_find_piece(a: Self, n: nat, x: Rational, j: nat)
+        requires
+            a.wf_spec(),
+            n > 0,
+            j > 0,
+            j <= n,
+            a.subdivide_point_spec(n, 0).le_spec(x),
+            x.lt_spec(a.subdivide_point_spec(n, j)),
+        ensures
+            exists|k: nat| k < n && a.subdivide_piece_spec(n, k).contains_spec(x),
+        decreases j,
+    {
+        let pj_minus_1 = a.subdivide_point_spec(n, (j - 1) as nat);
+        Rational::lemma_trichotomy(pj_minus_1, x);
+        if pj_minus_1.le_spec(x) {
+            // x in [point(j-1), point(j))
+            // piece j-1 = [point(j-1), point(j)]
+            // contains: point(j-1) ≤ x ✓, x ≤ point(j)
+            let pj = a.subdivide_point_spec(n, j);
+            Rational::lemma_lt_implies_le(x, pj);
+            let k = (j - 1) as nat;
+            assert(a.subdivide_piece_spec(n, k).contains_spec(x));
+        } else {
+            // x < point(j-1), recurse
+            if j == 1 {
+                // x < point(0) but point(0) ≤ x — contradiction
+                Rational::lemma_lt_implies_le(x, pj_minus_1);
+                Rational::lemma_le_antisymmetric(x, pj_minus_1);
+                // x ≡ point(0), so x is in piece 0
+                // But we said x < point(0) — contradiction with point(0) ≤ x
+                assert(false);
+            } else {
+                Self::lemma_subdivide_find_piece(a, n, x, (j - 1) as nat);
+            }
+        }
+    }
+    // ── Phase 7: Scalar root-finding support ────────────────────
+
+    // ── 7.1 Sign-change detection ──
+
+    /// Whether two values have opposite signs (one positive, one negative).
+    pub open spec fn sign_change_spec(f_lo: Rational, f_hi: Rational) -> bool {
+        (f_lo.signum() == 1 && f_hi.signum() == -1)
+        || (f_lo.signum() == -1 && f_hi.signum() == 1)
+    }
+
+    // ── 7.2 Scalar interval Newton step ──
+
+    /// N(X) = x_mid - f(x_mid)/f'(X) ∩ X.
+    /// Returns None if f'(X) contains zero (division undefined).
+    pub open spec fn scalar_newton_step_spec(
+        fx_mid: Rational,
+        fprime_interval: Interval,
+        x_mid: Rational,
+        x_interval: Interval,
+    ) -> Option<Interval> {
+        if fprime_interval.possibly_zero_spec() {
+            None
+        } else {
+            let fx_point = Self::from_point_spec(fx_mid);
+            let x_point = Self::from_point_spec(x_mid);
+            let quotient = fx_point.div_spec(fprime_interval);
+            let candidate = x_point.sub_spec(quotient);
+            candidate.intersect_spec(x_interval)
+        }
+    }
+
+    // ── 7.3 Interval Horner evaluation ──
+
+    /// Evaluate polynomial over an interval using Horner's method.
+    /// coeffs = [c₀, c₁, ..., cₙ], result encloses all p(x) for x ∈ X.
+    /// p(x) = c₀ + c₁x + c₂x² + ... = c₀ + x*(c₁ + x*(c₂ + ...))
+    pub open spec fn horner_eval_spec(coeffs: Seq<Rational>, x: Interval) -> Interval
+        decreases coeffs.len(),
+    {
+        if coeffs.len() == 0 {
+            Self::from_point_spec(Rational::from_int_spec(0))
+        } else {
+            let c0 = Self::from_point_spec(coeffs[0]);
+            let rest = coeffs.subrange(1, coeffs.len() as int);
+            c0.add_spec(x.mul_spec(Self::horner_eval_spec(rest, x)))
+        }
+    }
+
+    /// Horner evaluation is well-formed.
+    pub proof fn lemma_horner_eval_wf(coeffs: Seq<Rational>, x: Interval)
+        requires
+            x.wf_spec(),
+        ensures
+            Self::horner_eval_spec(coeffs, x).wf_spec(),
+        decreases coeffs.len(),
+    {
+        if coeffs.len() == 0 {
+            Self::lemma_from_point_wf(Rational::from_int_spec(0));
+        } else {
+            let rest = coeffs.subrange(1, coeffs.len() as int);
+            Self::lemma_horner_eval_wf(rest, x);
+            let inner = Self::horner_eval_spec(rest, x);
+            Self::lemma_mul_wf(x, inner);
+            let product = x.mul_spec(inner);
+            let c0 = Self::from_point_spec(coeffs[0]);
+            Self::lemma_from_point_wf(coeffs[0]);
+            Self::lemma_add_wf(c0, product);
+        }
+    }
+
+    /// Horner containment: x ∈ X → horner(coeffs, x) ∈ horner_eval(coeffs, X).
+    pub proof fn lemma_horner_containment(coeffs: Seq<Rational>, a: Self, x: Rational)
+        requires
+            a.wf_spec(),
+            a.contains_spec(x),
+        ensures
+            Self::horner_eval_spec(coeffs, a).contains_spec(
+                Rational::horner_spec(coeffs, x)),
+        decreases coeffs.len(),
+    {
+        if coeffs.len() == 0 {
+            // horner([], x) = 0, eval = from_point(0), 0 ∈ [0,0] ✓
+            Self::lemma_from_point_wf(Rational::from_int_spec(0));
+            Self::lemma_from_point_contains(Rational::from_int_spec(0));
+        } else {
+            let rest = coeffs.subrange(1, coeffs.len() as int);
+            // Induction: horner(rest, x) ∈ horner_eval(rest, a)
+            Self::lemma_horner_containment(rest, a, x);
+            let inner_val = Rational::horner_spec(rest, x);
+            let inner_iv = Self::horner_eval_spec(rest, a);
+
+            // x ∈ a, inner_val ∈ inner_iv → x*inner_val ∈ a*inner_iv
+            Self::lemma_horner_eval_wf(rest, a);
+            Self::lemma_mul_containment(a, inner_iv, x, inner_val);
+            let product_val = x.mul_spec(inner_val);
+            let product_iv = a.mul_spec(inner_iv);
+
+            // c0 ∈ [c0, c0]
+            let c0 = coeffs[0];
+            Self::lemma_from_point_wf(c0);
+            Self::lemma_from_point_contains(c0);
+            let c0_iv = Self::from_point_spec(c0);
+
+            // c0 + x*inner ∈ c0_iv + product_iv
+            Self::lemma_mul_wf(a, inner_iv);
+            Self::lemma_add_containment(c0_iv, product_iv, c0, product_val);
+        }
+    }
+
+    // ── 7.4 Derivative coefficients ──
+
+    /// Compute derivative polynomial coefficients.
+    /// If p(x) = c₀ + c₁x + c₂x² + ..., then p'(x) = c₁ + 2c₂x + 3c₃x² + ...
+    /// Output: [c₁, 2*c₂, 3*c₃, ...]
+    pub open spec fn poly_derivative_coeffs_spec(coeffs: Seq<Rational>) -> Seq<Rational> {
+        if coeffs.len() <= 1 {
+            Seq::empty()
+        } else {
+            Seq::new(
+                (coeffs.len() - 1) as nat,
+                |i: int| Rational::from_int_spec((i + 1) as int).mul_spec(coeffs[i + 1]),
+            )
+        }
+    }
+    // ── Phase 8: Interval distance & metric ─────────────────────
+
+    // ── 8.1 Hausdorff distance ──
+
+    /// Hausdorff distance between two intervals.
+    /// max(|lo₁ - lo₂|, |hi₁ - hi₂|)
+    pub open spec fn hausdorff_spec(self, other: Interval) -> Rational {
+        self.lo.sub_spec(other.lo).abs_spec().max_spec(
+            self.hi.sub_spec(other.hi).abs_spec())
+    }
+
+    /// Hausdorff distance is zero iff intervals are componentwise equivalent.
+    pub proof fn lemma_hausdorff_zero_iff_equal(a: Self, b: Self)
+        requires
+            a.wf_spec(),
+            b.wf_spec(),
+        ensures
+            a.hausdorff_spec(b).eqv_spec(Rational::from_int_spec(0))
+            <==> (a.lo.sub_spec(b.lo).eqv_spec(Rational::from_int_spec(0))
+                && a.hi.sub_spec(b.hi).eqv_spec(Rational::from_int_spec(0))),
+    {
+        let zero = Rational::from_int_spec(0);
+        let d_lo = a.lo.sub_spec(b.lo).abs_spec();
+        let d_hi = a.hi.sub_spec(b.hi).abs_spec();
+        let h = d_lo.max_spec(d_hi);
+
+        // abs(x) ≡ 0 ↔ x ≡ 0
+        Rational::lemma_abs_zero_iff(a.lo.sub_spec(b.lo));
+        Rational::lemma_abs_zero_iff(a.hi.sub_spec(b.hi));
+
+        // abs values are nonneg
+        Rational::lemma_abs_nonneg(a.lo.sub_spec(b.lo));
+        Rational::lemma_abs_nonneg(a.hi.sub_spec(b.hi));
+
+        // Forward: if h ≡ 0 then both d_lo ≡ 0 and d_hi ≡ 0
+        if h.eqv_spec(zero) {
+            // max(d_lo, d_hi) ≡ 0 with d_lo, d_hi ≥ 0 → both ≡ 0
+            // d_lo ≤ max(d_lo, d_hi) = h ≡ 0
+            Rational::lemma_max_ge_left(d_lo, d_hi);
+            Rational::lemma_eqv_implies_le(h, zero);
+            Rational::lemma_le_transitive(d_lo, h, zero);
+            // d_lo ≥ 0 from signum
+            // d_lo.signum() >= 0 means d_lo.num >= 0
+            // zero.le_spec(d_lo): 0 * d_lo.denom() <= d_lo.num * 1
+            // Since d_lo = |lo_diff| has num >= 0, this is 0 <= d_lo.num ✓
+            Rational::lemma_denom_positive(d_lo);
+            assert(zero.le_spec(d_lo)) by (nonlinear_arith)
+                requires
+                    d_lo.num >= 0,
+                    zero.num == 0int,
+                    zero.denom() == 1int,
+                    d_lo.denom() > 0,
+            ;
+            Rational::lemma_le_antisymmetric(d_lo, zero);
+            // d_lo ≡ 0
+
+            Rational::lemma_max_ge_right(d_lo, d_hi);
+            Rational::lemma_le_transitive(d_hi, h, zero);
+            Rational::lemma_denom_positive(d_hi);
+            assert(zero.le_spec(d_hi)) by (nonlinear_arith)
+                requires
+                    d_hi.num >= 0,
+                    zero.num == 0int,
+                    zero.denom() == 1int,
+                    d_hi.denom() > 0,
+            ;
+            Rational::lemma_le_antisymmetric(d_hi, zero);
+            // d_hi ≡ 0
+        }
+
+        // Backward: if both d_lo ≡ 0 and d_hi ≡ 0, then h = max(0, 0) ≡ 0
+        if d_lo.eqv_spec(zero) && d_hi.eqv_spec(zero) {
+            // max(d_lo, d_hi) where d_lo ≡ 0 and d_hi ≡ 0
+            // d_lo.le_spec(d_hi): both ≡ 0, so 0 ≤ 0 ✓
+            Rational::lemma_eqv_implies_le(d_lo, d_hi);
+            // h = d_hi when d_lo ≤ d_hi
+            // h ≡ d_hi ≡ 0
+            Rational::lemma_eqv_symmetric(d_hi, zero);
+            Rational::lemma_trichotomy(d_lo, d_hi);
+            if d_lo.le_spec(d_hi) {
+                assert(h == d_hi);
+            } else {
+                assert(h == d_lo);
+            }
+        }
+    }
+
+    /// Hausdorff triangle inequality:
+    /// hausdorff(a, c) ≤ hausdorff(a, b) + hausdorff(b, c).
+    pub proof fn lemma_hausdorff_triangle(a: Self, b: Self, c: Self)
+        requires
+            a.wf_spec(),
+            b.wf_spec(),
+            c.wf_spec(),
+        ensures
+            a.hausdorff_spec(c).le_spec(
+                a.hausdorff_spec(b).add_spec(b.hausdorff_spec(c))),
+    {
+        let zero = Rational::from_int_spec(0);
+
+        // Differences
+        let dlo_ac = a.lo.sub_spec(c.lo);
+        let dhi_ac = a.hi.sub_spec(c.hi);
+        let dlo_ab = a.lo.sub_spec(b.lo);
+        let dhi_ab = a.hi.sub_spec(b.hi);
+        let dlo_bc = b.lo.sub_spec(c.lo);
+        let dhi_bc = b.hi.sub_spec(c.hi);
+
+        // Key identity: (a - c) = (a - b) + (b - c) for both lo and hi
+        // dlo_ac ≡ dlo_ab + dlo_bc
+        Rational::lemma_sub_then_add_cancel(a.lo, b.lo);
+        // b.lo + (a.lo - b.lo) ≡ a.lo
+        // We need: (a.lo - b.lo) + (b.lo - c.lo) ≡ a.lo - c.lo
+
+        // Triangle inequality for rationals: |u + v| ≤ |u| + |v|
+        // Applied to u = dlo_ab, v = dlo_bc:
+        // |dlo_ab + dlo_bc| ≤ |dlo_ab| + |dlo_bc|
+        Rational::lemma_triangle_inequality(dlo_ab, dlo_bc);
+        // And similarly for hi:
+        Rational::lemma_triangle_inequality(dhi_ab, dhi_bc);
+
+        // Now: dlo_ab + dlo_bc ≡ dlo_ac (algebraic identity)
+        // (a.lo - b.lo) + (b.lo - c.lo) ≡ a.lo - c.lo
+        // This is lemma_sub_add_distributes or similar
+        // Let's prove: (a-b) + (b-c) = a + (-b) + b + (-c) = a + (-c) = a - c
+        // Structurally: sub_spec is add_spec(neg_spec)
+        // dlo_ab = a.lo.add_spec(b.lo.neg_spec())
+        // dlo_bc = b.lo.add_spec(c.lo.neg_spec())
+        // sum = dlo_ab.add_spec(dlo_bc)
+        //     = (a.lo + (-b.lo)) + (b.lo + (-c.lo))
+        // We need this ≡ a.lo + (-c.lo) = a.lo - c.lo
+
+        // Use eqv_sub_cancel_right or similar. Actually:
+        // (a + (-b)) + (b + (-c)) ≡ ((a + (-b)) + b) + (-c)  by assoc
+        // (a + (-b)) + b ≡ a  by add_then_sub_cancel variant
+        // So the whole thing ≡ a + (-c) = a - c
+
+        // Actually, let's use a simpler approach. We know:
+        // dlo_ab.add_spec(dlo_bc) structurally has certain num/den values.
+        // And dlo_ac has certain num/den values.
+        // We need them to be eqv_spec.
+        // Rather than proving this algebraically, we can show:
+        // |dlo_ac| ≤ |dlo_ab| + |dlo_bc| directly from triangle inequality
+        // IF dlo_ac ≡ dlo_ab + dlo_bc. But we need that eqv.
+
+        // Let's use a direct approach instead. Expand to cross-multiplication.
+        // (a.lo - b.lo) + (b.lo - c.lo) and (a.lo - c.lo):
+        // sub_spec gives add_spec(neg_spec), which gives specific num/den formulas.
+        // This is provable by nonlinear_arith but may be complex.
+
+        // Simpler: use lemma_sub_add_sub_cancel which should give us
+        // (a - b) + (b - c) ≡ a - c
+        Self::lemma_sub_add_sub_eqv(a.lo, b.lo, c.lo);
+        Self::lemma_sub_add_sub_eqv(a.hi, b.hi, c.hi);
+        // Now: dlo_ab + dlo_bc ≡ dlo_ac
+        // So |dlo_ab + dlo_bc| ≡ |dlo_ac| (abs respects eqv)
+        // Actually we need the eqv to transfer through abs.
+        // |dlo_ab + dlo_bc| ≤ |dlo_ab| + |dlo_bc| (triangle ineq, already called)
+        // And |dlo_ac| ≤ |dlo_ab + dlo_bc| (from eqv, specifically they're ≡)
+        // Actually: since dlo_ab + dlo_bc ≡ dlo_ac, |dlo_ab + dlo_bc| ≡ |dlo_ac|
+        Self::lemma_eqv_abs_congruence(
+            dlo_ab.add_spec(dlo_bc), dlo_ac);
+        Self::lemma_eqv_abs_congruence(
+            dhi_ab.add_spec(dhi_bc), dhi_ac);
+
+        // |dlo_ac| ≡ |dlo_ab + dlo_bc| ≤ |dlo_ab| + |dlo_bc|
+        let abs_lo_ac = dlo_ac.abs_spec();
+        let abs_hi_ac = dhi_ac.abs_spec();
+        let abs_lo_ab = dlo_ab.abs_spec();
+        let abs_hi_ab = dhi_ab.abs_spec();
+        let abs_lo_bc = dlo_bc.abs_spec();
+        let abs_hi_bc = dhi_bc.abs_spec();
+
+        let sum_lo = dlo_ab.add_spec(dlo_bc);
+        let sum_hi = dhi_ab.add_spec(dhi_bc);
+
+        // |sum_lo| ≤ |dlo_ab| + |dlo_bc|
+        // and |sum_lo| ≡ |dlo_ac|
+        // so |dlo_ac| ≤ |dlo_ab| + |dlo_bc|
+        Rational::lemma_eqv_symmetric(sum_lo.abs_spec(), abs_lo_ac);
+        Rational::lemma_eqv_implies_le(abs_lo_ac, sum_lo.abs_spec());
+        Rational::lemma_le_transitive(abs_lo_ac, sum_lo.abs_spec(),
+            abs_lo_ab.add_spec(abs_lo_bc));
+
+        Rational::lemma_eqv_symmetric(sum_hi.abs_spec(), abs_hi_ac);
+        Rational::lemma_eqv_implies_le(abs_hi_ac, sum_hi.abs_spec());
+        Rational::lemma_le_transitive(abs_hi_ac, sum_hi.abs_spec(),
+            abs_hi_ab.add_spec(abs_hi_bc));
+
+        // Now: |dlo_ac| ≤ |dlo_ab| + |dlo_bc| ≤ hab + hbc
+        // where hab = max(|dlo_ab|, |dhi_ab|), hbc = max(|dlo_bc|, |dhi_bc|)
+        let hab = a.hausdorff_spec(b);
+        let hbc = b.hausdorff_spec(c);
+
+        // |dlo_ab| ≤ max(|dlo_ab|, |dhi_ab|) = hab
+        Rational::lemma_max_ge_left(abs_lo_ab, abs_hi_ab);
+        // |dlo_bc| ≤ max(|dlo_bc|, |dhi_bc|) = hbc
+        Rational::lemma_max_ge_left(abs_lo_bc, abs_hi_bc);
+        // |dlo_ab| + |dlo_bc| ≤ hab + hbc
+        Rational::lemma_le_add_both(abs_lo_ab, hab, abs_lo_bc, hbc);
+        // |dlo_ac| ≤ |dlo_ab| + |dlo_bc| ≤ hab + hbc
+        Rational::lemma_le_transitive(abs_lo_ac,
+            abs_lo_ab.add_spec(abs_lo_bc),
+            hab.add_spec(hbc));
+
+        // Similarly for hi
+        Rational::lemma_max_ge_right(abs_lo_ab, abs_hi_ab);
+        Rational::lemma_max_ge_right(abs_lo_bc, abs_hi_bc);
+        Rational::lemma_le_add_both(abs_hi_ab, hab, abs_hi_bc, hbc);
+        Rational::lemma_le_transitive(abs_hi_ac,
+            abs_hi_ab.add_spec(abs_hi_bc),
+            hab.add_spec(hbc));
+
+        // max(|dlo_ac|, |dhi_ac|) ≤ hab + hbc
+        // Since both |dlo_ac| ≤ hab+hbc and |dhi_ac| ≤ hab+hbc,
+        // max(|dlo_ac|, |dhi_ac|) ≤ hab+hbc.
+        Rational::lemma_trichotomy(abs_lo_ac, abs_hi_ac);
+        let hac = a.hausdorff_spec(c);
+        if abs_lo_ac.le_spec(abs_hi_ac) {
+            assert(hac == abs_hi_ac);
+        } else {
+            assert(hac == abs_lo_ac);
+        }
+    }
+
+    /// Helper: if a ≡ b then |a| ≡ |b|.
+    proof fn lemma_eqv_abs_congruence(a: Rational, b: Rational)
+        requires
+            a.eqv_spec(b),
+        ensures
+            a.abs_spec().eqv_spec(b.abs_spec()),
+    {
+        Rational::lemma_denom_positive(a);
+        Rational::lemma_denom_positive(b);
+        if a.num >= 0 && b.num >= 0 {
+            assert(a.abs_spec() == a);
+            assert(b.abs_spec() == b);
+        } else if a.num < 0 && b.num < 0 {
+            assert(a.abs_spec() == a.neg_spec());
+            assert(b.abs_spec() == b.neg_spec());
+            assert(a.abs_spec().num * b.abs_spec().denom()
+                == b.abs_spec().num * a.abs_spec().denom()) by (nonlinear_arith)
+                requires
+                    a.num * b.denom() == b.num * a.denom(),
+                    a.abs_spec().num == -a.num,
+                    b.abs_spec().num == -b.num,
+                    a.abs_spec().denom() == a.denom(),
+                    b.abs_spec().denom() == b.denom(),
+            ;
+        } else if a.num >= 0 && b.num < 0 {
+            assert(false) by (nonlinear_arith)
+                requires
+                    a.num >= 0, b.num < 0,
+                    a.denom() > 0, b.denom() > 0,
+                    a.num * b.denom() == b.num * a.denom(),
+            ;
+        } else {
+            assert(false) by (nonlinear_arith)
+                requires
+                    a.num < 0, b.num >= 0,
+                    a.denom() > 0, b.denom() > 0,
+                    a.num * b.denom() == b.num * a.denom(),
+            ;
+        }
+    }
+
+    /// Helper: (a - b) + (b - c) ≡ (a - c).
+    proof fn lemma_sub_add_sub_eqv(a: Rational, b: Rational, c: Rational)
+        ensures
+            a.sub_spec(b).add_spec(b.sub_spec(c)).eqv_spec(a.sub_spec(c)),
+    {
+        // (a - b) + (b - c)
+        // = (a + (-b)) + (b + (-c))
+        let ab = a.sub_spec(b); // a + (-b)
+        let bc = b.sub_spec(c); // b + (-c)
+        let sum = ab.add_spec(bc);
+        let target = a.sub_spec(c);
+
+        // Use cross-multiplication to show eqv.
+        // sum.num * target.denom() == target.num * sum.denom()
+        // This is a concrete identity about the Rational struct fields.
+        // sub_spec(a, b) = a.add_spec(b.neg_spec())
+        // Expanding is complex but the SMT solver with nonlinear_arith can handle it
+        // if we give it the right structural equalities.
+
+        Rational::lemma_add_denom_product_int(ab, bc);
+        Rational::lemma_add_denom_product_int(a, b.neg_spec());
+        Rational::lemma_add_denom_product_int(b, c.neg_spec());
+        Rational::lemma_add_denom_product_int(a, c.neg_spec());
+        Rational::lemma_denom_positive(a);
+        Rational::lemma_denom_positive(b);
+        Rational::lemma_denom_positive(c);
+
+        let da = a.denom();
+        let db = b.denom();
+        let dc = c.denom();
+        let nb = b.neg_spec();
+        let nc = c.neg_spec();
+
+        assert(nb.num == -b.num);
+        assert(nb.denom() == db);
+        assert(nc.num == -c.num);
+        assert(nc.denom() == dc);
+
+        // ab = a + (-b), ab.num = a.num * db + (-b.num) * da = a.num * db - b.num * da
+        // ab.denom() = da * db
+        assert(ab.num == a.num * db + nb.num * da);
+        assert(ab.denom() == da * db);
+        // bc = b + (-c), bc.num = b.num * dc + (-c.num) * db = b.num * dc - c.num * db
+        // bc.denom() = db * dc
+        assert(bc.num == b.num * dc + nc.num * db);
+        assert(bc.denom() == db * dc);
+        // sum = ab + bc
+        // sum.num = ab.num * bc.denom() + bc.num * ab.denom()
+        //         = (a.num*db - b.num*da) * (db*dc) + (b.num*dc - c.num*db) * (da*db)
+        // sum.denom() = ab.denom() * bc.denom() = (da*db) * (db*dc)
+        assert(sum.num == ab.num * bc.denom() + bc.num * ab.denom());
+        assert(sum.denom() == ab.denom() * bc.denom());
+
+        // target = a + (-c)
+        // target.num = a.num * dc + (-c.num) * da = a.num * dc - c.num * da
+        // target.denom() = da * dc
+        assert(target.num == a.num * dc + nc.num * da);
+        assert(target.denom() == da * dc);
+
+        // Need: sum.num * target.denom() == target.num * sum.denom()
+        assert(sum.num * target.denom() == target.num * sum.denom()) by (nonlinear_arith)
+            requires
+                ab.num == a.num * db + nb.num * da,
+                ab.denom() == da * db,
+                bc.num == b.num * dc + nc.num * db,
+                bc.denom() == db * dc,
+                sum.num == ab.num * (db * dc) + bc.num * (da * db),
+                sum.denom() == (da * db) * (db * dc),
+                target.num == a.num * dc + nc.num * da,
+                target.denom() == da * dc,
+                da > 0,
+                db > 0,
+                dc > 0,
+                nb.num == -b.num,
+                nc.num == -c.num,
+        ;
+    }
+
+    // ── 8.2 Gap between disjoint intervals ──
+
+    /// Gap (separation) between two intervals.
+    /// Positive iff the intervals are disjoint.
+    pub open spec fn gap_spec(self, other: Interval) -> Rational {
+        let zero = Rational::from_int_spec(0);
+        zero.max_spec(
+            self.lo.sub_spec(other.hi).max_spec(
+                other.lo.sub_spec(self.hi)))
+    }
+
+    /// Gap is positive iff intervals are disjoint.
+    pub proof fn lemma_gap_positive_iff_disjoint(a: Self, b: Self)
+        requires
+            a.wf_spec(),
+            b.wf_spec(),
+        ensures
+            Rational::from_int_spec(0).lt_spec(a.gap_spec(b))
+            <==> a.disjoint_spec(b),
+    {
+        let zero = Rational::from_int_spec(0);
+        let d1 = a.lo.sub_spec(b.hi); // a.lo - b.hi
+        let d2 = b.lo.sub_spec(a.hi); // b.lo - a.hi
+        let inner_max = d1.max_spec(d2);
+        let gap = zero.max_spec(inner_max);
+
+        // disjoint(a, b) = a.hi.lt_spec(b.lo) || b.hi.lt_spec(a.lo)
+        // i.e., a.hi < b.lo ∨ b.hi < a.lo
+
+        // Forward: 0 < gap → disjoint
+        if zero.lt_spec(gap) {
+            // gap = max(0, max(d1, d2)) > 0 → max(d1, d2) > 0
+            // → d1 > 0 ∨ d2 > 0
+            // d1 > 0 means a.lo - b.hi > 0 means a.lo > b.hi means b.hi < a.lo
+            // d2 > 0 means b.lo - a.hi > 0 means b.lo > a.hi means a.hi < b.lo
+            Rational::lemma_trichotomy(zero, inner_max);
+            if zero.le_spec(inner_max) {
+                assert(gap == inner_max);
+            } else {
+                // gap = zero, contradicts 0 < gap
+                assert(gap == zero);
+                assert(false);
+            }
+            // Now 0 < inner_max = max(d1, d2)
+            Rational::lemma_trichotomy(d1, d2);
+            if d1.le_spec(d2) {
+                // inner_max = d2 > 0
+                // b.lo - a.hi > 0 → a.hi < b.lo
+                Self::lemma_pos_sub_implies_lt(a.hi, b.lo);
+            } else {
+                // inner_max = d1 > 0
+                // a.lo - b.hi > 0 → b.hi < a.lo
+                Self::lemma_pos_sub_implies_lt(b.hi, a.lo);
+            }
+        }
+
+        // Backward: disjoint → 0 < gap
+        if a.disjoint_spec(b) {
+            if a.hi.lt_spec(b.lo) {
+                // a.hi < b.lo → b.lo - a.hi > 0 → d2 > 0
+                Self::lemma_lt_implies_pos_sub(a.hi, b.lo);
+                // d2 > 0, so max(d1, d2) ≥ d2 > 0
+                Rational::lemma_max_ge_right(d1, d2);
+                Rational::lemma_lt_le_transitive(zero, d2, inner_max);
+                // gap = max(0, inner_max) ≥ inner_max > 0
+                Rational::lemma_max_ge_right(zero, inner_max);
+                Rational::lemma_lt_le_transitive(zero, inner_max, gap);
+            } else {
+                // b.hi < a.lo → a.lo - b.hi > 0 → d1 > 0
+                Self::lemma_lt_implies_pos_sub(b.hi, a.lo);
+                Rational::lemma_max_ge_left(d1, d2);
+                Rational::lemma_lt_le_transitive(zero, d1, inner_max);
+                Rational::lemma_max_ge_right(zero, inner_max);
+                Rational::lemma_lt_le_transitive(zero, inner_max, gap);
+            }
+        }
+    }
+
+    /// Gap bounds element distance: x ∈ a ∧ y ∈ b → |x - y| ≥ gap(a, b).
+    pub proof fn lemma_gap_bounds_element_distance(a: Self, b: Self, x: Rational, y: Rational)
+        requires
+            a.wf_spec(),
+            b.wf_spec(),
+            a.contains_spec(x),
+            b.contains_spec(y),
+        ensures
+            a.gap_spec(b).le_spec(x.sub_spec(y).abs_spec()),
+    {
+        let zero = Rational::from_int_spec(0);
+        let d1 = a.lo.sub_spec(b.hi);
+        let d2 = b.lo.sub_spec(a.hi);
+        let inner_max = d1.max_spec(d2);
+        let gap = zero.max_spec(inner_max);
+        let diff = x.sub_spec(y);
+        let abs_diff = diff.abs_spec();
+
+        // gap ≤ |x - y|
+        // Case 1: gap = 0 (intervals overlap)
+        // Then 0 ≤ |x - y| ✓
+        Rational::lemma_abs_nonneg(diff);
+        Rational::lemma_denom_positive(abs_diff);
+        assert(zero.le_spec(abs_diff)) by (nonlinear_arith)
+            requires
+                abs_diff.num >= 0,
+                abs_diff.denom() > 0,
+                zero.num == 0int,
+                zero.denom() == 1int,
+        ;
+
+        // Case 2: gap > 0 → intervals are disjoint
+        // d1 = a.lo - b.hi: since a.lo ≤ x and y ≤ b.hi,
+        //   d1 = a.lo - b.hi ≤ x - y
+        Rational::lemma_sub_le_monotone_left(a.lo, x, b.hi);
+        // a.lo - b.hi ≤ x - b.hi
+        Rational::lemma_sub_le_monotone_right(y, b.hi, x);
+        // x - b.hi ≤ x - y
+        Rational::lemma_le_transitive(d1, x.sub_spec(b.hi), diff);
+
+        // d2 = b.lo - a.hi: since b.lo ≤ y and x ≤ a.hi,
+        //   d2 = b.lo - a.hi ≤ y - x = -(x - y)
+        Rational::lemma_sub_le_monotone_left(b.lo, y, a.hi);
+        Rational::lemma_sub_le_monotone_right(x, a.hi, y);
+        Rational::lemma_le_transitive(d2, y.sub_spec(a.hi), y.sub_spec(x));
+        // y - x = -(x - y)
+        let neg_diff = diff.neg_spec();
+
+        // d1 ≤ x - y and d1 ≤ |x - y| (since x-y ≤ |x-y|)
+        // d2 ≤ y - x = -(x - y) and d2 ≤ |x - y| (since -(x-y) ≤ |x-y|)
+        // So max(d1, d2) ≤ |x - y|
+        // And gap = max(0, max(d1, d2)) ≤ max(0, |x-y|) = |x-y| (since |x-y| ≥ 0)
+
+        // x - y ≤ |x - y|
+        if diff.num >= 0 {
+            assert(abs_diff == diff);
+        } else {
+            // diff.num < 0, abs = neg_spec, neg_diff
+            assert(abs_diff == neg_diff);
+            Rational::lemma_neg_reverses_le(diff, zero);
+            // 0 ≤ -diff = neg_diff = abs_diff
+            // diff ≤ 0 ≤ abs_diff
+            Rational::lemma_le_transitive(diff, zero, abs_diff);
+        }
+        // So diff ≤ abs_diff
+        // d1 ≤ diff ≤ abs_diff
+        Rational::lemma_le_transitive(d1, diff, abs_diff);
+
+        // -(x-y) ≤ |x-y|
+        if diff.num >= 0 {
+            // neg_diff.num ≤ 0
+            assert(neg_diff.num == -diff.num);
+            // abs_diff = diff, neg_diff ≤ 0 ≤ diff = abs_diff
+            assert(neg_diff.num <= 0);
+            Rational::lemma_denom_positive(neg_diff);
+            assert(neg_diff.le_spec(zero)) by (nonlinear_arith)
+                requires
+                    neg_diff.num <= 0,
+                    neg_diff.denom() > 0,
+                    zero.num == 0int,
+                    zero.denom() == 1int,
+            ;
+            Rational::lemma_le_transitive(neg_diff, zero, abs_diff);
+        } else {
+            assert(abs_diff == neg_diff);
+        }
+        // neg_diff ≤ abs_diff
+
+        // y - x = -(x - y) structurally:
+        // lemma_neg_sub(x, y) ensures x.sub_spec(y).neg_spec() == y.sub_spec(x)
+        Rational::lemma_neg_sub(x, y);
+        // So neg_diff = diff.neg_spec() = x.sub_spec(y).neg_spec() == y.sub_spec(x)
+        // d2 ≤ y.sub_spec(x) = neg_diff (structural equality)
+        // Since neg_diff == y.sub_spec(x) structurally, d2 ≤ neg_diff directly
+        // d2 ≤ neg_diff ≤ abs_diff
+        Rational::lemma_le_transitive(d2, neg_diff, abs_diff);
+
+        // max(d1, d2) ≤ abs_diff
+        Rational::lemma_trichotomy(d1, d2);
+        if d1.le_spec(d2) {
+            assert(inner_max == d2);
+        } else {
+            assert(inner_max == d1);
+        }
+
+        // gap = max(0, inner_max) ≤ max(0, abs_diff) = abs_diff (since abs_diff ≥ 0)
+        // If inner_max ≤ abs_diff:
+        //   gap = max(0, inner_max)
+        //   If 0 ≤ inner_max: gap = inner_max ≤ abs_diff ✓
+        //   If inner_max < 0: gap = 0 ≤ abs_diff ✓
+        Rational::lemma_trichotomy(zero, inner_max);
+        if zero.le_spec(inner_max) {
+            assert(gap == inner_max);
+        } else {
+            assert(gap == zero);
+        }
+    }
+
+    /// Helper: a < b → b - a > 0 (in lt_spec terms).
+    proof fn lemma_lt_implies_pos_sub(a: Rational, b: Rational)
+        requires
+            a.lt_spec(b),
+        ensures
+            Rational::from_int_spec(0).lt_spec(b.sub_spec(a)),
+    {
+        let zero = Rational::from_int_spec(0);
+        let diff = b.sub_spec(a);
+        Rational::lemma_denom_positive(a);
+        Rational::lemma_denom_positive(b);
+        Rational::lemma_add_denom_product_int(b, a.neg_spec());
+        let na = a.neg_spec();
+        assert(na.num == -a.num);
+        assert(diff.num == b.num * a.denom() + na.num * b.denom());
+        assert(diff.denom() == b.denom() * a.denom());
+        assert(zero.lt_spec(diff)) by (nonlinear_arith)
+            requires
+                a.num * b.denom() < b.num * a.denom(),
+                diff.num == b.num * a.denom() + na.num * b.denom(),
+                na.num == -a.num,
+                diff.denom() == b.denom() * a.denom(),
+                a.denom() > 0,
+                b.denom() > 0,
+                zero.num == 0int,
+                zero.denom() == 1int,
+        ;
+    }
+
+    /// Helper: b - a > 0 → a < b.
+    proof fn lemma_pos_sub_implies_lt(a: Rational, b: Rational)
+        requires
+            Rational::from_int_spec(0).lt_spec(b.sub_spec(a)),
+        ensures
+            a.lt_spec(b),
+    {
+        let zero = Rational::from_int_spec(0);
+        let diff = b.sub_spec(a);
+        Rational::lemma_denom_positive(a);
+        Rational::lemma_denom_positive(b);
+        Rational::lemma_add_denom_product_int(b, a.neg_spec());
+        let na = a.neg_spec();
+        assert(na.num == -a.num);
+        assert(diff.num == b.num * a.denom() + na.num * b.denom());
+        assert(diff.denom() == b.denom() * a.denom());
+        assert(a.lt_spec(b)) by (nonlinear_arith)
+            requires
+                zero.num * diff.denom() < diff.num * zero.denom(),
+                diff.num == b.num * a.denom() + na.num * b.denom(),
+                na.num == -a.num,
+                diff.denom() == b.denom() * a.denom(),
+                a.denom() > 0,
+                b.denom() > 0,
+                zero.num == 0int,
+                zero.denom() == 1int,
+        ;
     }
 }
 
