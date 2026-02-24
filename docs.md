@@ -6,323 +6,323 @@
 
 ### Spec Functions
 
-- **`open spec fn bisect_spec`** — [interval.rs:2542](./srcinterval.rs#L2542)
+- **`open spec fn bisect_spec`** — [interval.rs:2542](./src/interval.rs#L2542)
   > Bisect at midpoint: returns ([lo, mid], [mid, hi]).
-- **`open spec fn split_at_spec`** — [interval.rs:2551](./srcinterval.rs#L2551)
+- **`open spec fn split_at_spec`** — [interval.rs:2551](./src/interval.rs#L2551)
   > Split at an arbitrary rational point p in [lo, hi].
-- **`open spec fn subdivide_point_spec`** — [interval.rs:2560](./srcinterval.rs#L2560)
+- **`open spec fn subdivide_point_spec`** — [interval.rs:2560](./src/interval.rs#L2560)
   > N-way uniform subdivision: n equal-width pieces. Piece k = [lo + k*(hi-lo)/n, lo + (k+1)*(hi-lo)/n].
-- **`open spec fn subdivide_piece_spec`** — [interval.rs:2570](./srcinterval.rs#L2570)
+- **`open spec fn subdivide_piece_spec`** — [interval.rs:2570](./src/interval.rs#L2570)
   > The k-th piece of an n-way uniform subdivision.
-- **`open spec fn sign_change_spec`** — [interval.rs:2909](./srcinterval.rs#L2909)
+- **`open spec fn sign_change_spec`** — [interval.rs:2909](./src/interval.rs#L2909)
   > Whether two values have opposite signs (one positive, one negative).
-- **`open spec fn scalar_newton_step_spec`** — [interval.rs:2918](./srcinterval.rs#L2918)
+- **`open spec fn scalar_newton_step_spec`** — [interval.rs:2918](./src/interval.rs#L2918)
   > N(X) = x_mid - f(x_mid)/f'(X) ∩ X. Returns None if f'(X) contains zero (division undefined).
-- **`open spec fn horner_eval_spec`** — [interval.rs:2940](./srcinterval.rs#L2940)
+- **`open spec fn horner_eval_spec`** — [interval.rs:2940](./src/interval.rs#L2940)
   > Evaluate polynomial over an interval using Horner's method. coeffs = [c₀, c₁, ..., cₙ], result encloses all p(x) for x ∈ X. p(x) = c₀ + c₁x + c₂x² + ... = c₀ + x*(c₁ + x*(c₂ + ...))
-- **`open spec fn poly_derivative_coeffs_spec`** — [interval.rs:3018](./srcinterval.rs#L3018)
+- **`open spec fn poly_derivative_coeffs_spec`** — [interval.rs:3018](./src/interval.rs#L3018)
   > Compute derivative polynomial coefficients. If p(x) = c₀ + c₁x + c₂x² + ..., then p'(x) = c₁ + 2c₂x + 3c₃x² + ... Output: [c₁, 2*c₂, 3*c₃, ...]
-- **`open spec fn hausdorff_spec`** — [interval.rs:3034](./srcinterval.rs#L3034)
+- **`open spec fn hausdorff_spec`** — [interval.rs:3034](./src/interval.rs#L3034)
   > Hausdorff distance between two intervals. max(|lo₁ - lo₂|, |hi₁ - hi₂|)
-- **`open spec fn gap_spec`** — [interval.rs:3376](./srcinterval.rs#L3376)
+- **`open spec fn gap_spec`** — [interval.rs:3376](./src/interval.rs#L3376)
   > Gap (separation) between two intervals. Positive iff the intervals are disjoint.
 
 ### Proof Functions
 
-- **`proof fn lemma_recip_wf`** — [interval.rs:540](./srcinterval.rs#L540)
+- **`proof fn lemma_recip_wf`** — [interval.rs:540](./src/interval.rs#L540)
   > Reciprocal well-formedness: 0 not in A => recip(A).wf_spec().
-- **`proof fn lemma_recip_containment`** — [interval.rs:558](./srcinterval.rs#L558)
+- **`proof fn lemma_recip_containment`** — [interval.rs:558](./src/interval.rs#L558)
   > Reciprocal containment: x in A and 0 not in A => 1/x in 1/A.
-- **`proof fn lemma_div_wf`** — [interval.rs:589](./srcinterval.rs#L589)
+- **`proof fn lemma_div_wf`** — [interval.rs:589](./src/interval.rs#L589)
   > Division well-formedness: A.wf and B.wf and 0 not in B => (A/B).wf.
-- **`proof fn lemma_div_containment`** — [interval.rs:602](./srcinterval.rs#L602)
+- **`proof fn lemma_div_containment`** — [interval.rs:602](./src/interval.rs#L602)
   > Division containment: x in A, y in B, 0 not in B => x/y in A/B.
-- **`proof fn lemma_contains_transitive`** — [interval.rs:622](./srcinterval.rs#L622)
+- **`proof fn lemma_contains_transitive`** — [interval.rs:622](./src/interval.rs#L622)
   > If b contains a as a sub-interval and x is in a, then x is in b.
-- **`proof fn lemma_contains_interval_transitive`** — [interval.rs:635](./srcinterval.rs#L635)
+- **`proof fn lemma_contains_interval_transitive`** — [interval.rs:635](./src/interval.rs#L635)
   > Sub-interval containment is transitive: a ⊆ b ⊆ c → a ⊆ c.
-- **`proof fn lemma_width_nonneg`** — [interval.rs:649](./srcinterval.rs#L649)
+- **`proof fn lemma_width_nonneg`** — [interval.rs:649](./src/interval.rs#L649)
   > Width of a well-formed interval is nonneg: wf(a) → 0 ≤ width(a).
-- **`proof fn lemma_add_width`** — [interval.rs:667](./srcinterval.rs#L667)
+- **`proof fn lemma_add_width`** — [interval.rs:667](./src/interval.rs#L667)
   > Width of a sum: width(a+b) ≡ width(a) + width(b).
-- **`proof fn lemma_neg_width`** — [interval.rs:680](./srcinterval.rs#L680)
+- **`proof fn lemma_neg_width`** — [interval.rs:680](./src/interval.rs#L680)
   > Width of a negation: width(-a) = width(a) (structural equality).
-- **`proof fn lemma_sub_width`** — [interval.rs:696](./srcinterval.rs#L696)
+- **`proof fn lemma_sub_width`** — [interval.rs:696](./src/interval.rs#L696)
   > Width of a difference: width(a-b) ≡ width(a) + width(b).
-- **`proof fn lemma_subset_implies_le_width`** — [interval.rs:717](./srcinterval.rs#L717)
+- **`proof fn lemma_subset_implies_le_width`** — [interval.rs:717](./src/interval.rs#L717)
   > If a ⊆ b then width(a) ≤ width(b).
-- **`proof fn lemma_point_interval_zero_width`** — [interval.rs:735](./srcinterval.rs#L735)
+- **`proof fn lemma_point_interval_zero_width`** — [interval.rs:735](./src/interval.rs#L735)
   > Width of a point interval is zero: width([x,x]) ≡ 0.
-- **`proof fn lemma_midpoint_in_interval`** — [interval.rs:747](./srcinterval.rs#L747)
+- **`proof fn lemma_midpoint_in_interval`** — [interval.rs:747](./src/interval.rs#L747)
   > Midpoint of a well-formed interval lies in the interval.
-- **`proof fn lemma_intersect_containment`** — [interval.rs:791](./srcinterval.rs#L791)
+- **`proof fn lemma_intersect_containment`** — [interval.rs:791](./src/interval.rs#L791)
   > If intersection is Some, then any point in both inputs is in the result.
-- **`proof fn lemma_intersect_subset_both`** — [interval.rs:824](./srcinterval.rs#L824)
+- **`proof fn lemma_intersect_subset_both`** — [interval.rs:824](./src/interval.rs#L824)
   > If intersection is Some, the result is a sub-interval of both inputs.
-- **`proof fn lemma_hull_contains_both`** — [interval.rs:848](./srcinterval.rs#L848)
+- **`proof fn lemma_hull_contains_both`** — [interval.rs:848](./src/interval.rs#L848)
   > Hull contains both input intervals.
-- **`proof fn lemma_hull_minimal`** — [interval.rs:865](./srcinterval.rs#L865)
+- **`proof fn lemma_hull_minimal`** — [interval.rs:865](./src/interval.rs#L865)
   > Hull is minimal: if c contains both a and b, then c contains hull(a,b).
-- **`proof fn lemma_add_monotone`** — [interval.rs:900](./srcinterval.rs#L900)
+- **`proof fn lemma_add_monotone`** — [interval.rs:900](./src/interval.rs#L900)
   > Addition is monotone: a ⊆ a' ∧ b ⊆ b' → a+b ⊆ a'+b'.
-- **`proof fn lemma_neg_monotone`** — [interval.rs:916](./srcinterval.rs#L916)
+- **`proof fn lemma_neg_monotone`** — [interval.rs:916](./src/interval.rs#L916)
   > Negation is monotone: a ⊆ a' → -a ⊆ -a'.
-- **`proof fn lemma_mul_monotone`** — [interval.rs:930](./srcinterval.rs#L930)
+- **`proof fn lemma_mul_monotone`** — [interval.rs:930](./src/interval.rs#L930)
   > Multiplication is monotone: a ⊆ a' ∧ b ⊆ b' → a*b ⊆ a'*b'.
-- **`proof fn lemma_certainly_positive_implies`** — [interval.rs:1036](./srcinterval.rs#L1036)
+- **`proof fn lemma_certainly_positive_implies`** — [interval.rs:1036](./src/interval.rs#L1036)
   > If an interval is certainly positive, every element is positive.
-- **`proof fn lemma_certainly_negative_implies`** — [interval.rs:1050](./srcinterval.rs#L1050)
+- **`proof fn lemma_certainly_negative_implies`** — [interval.rs:1050](./src/interval.rs#L1050)
   > If an interval is certainly negative, every element is negative.
-- **`proof fn lemma_not_possibly_zero_implies`** — [interval.rs:1064](./srcinterval.rs#L1064)
+- **`proof fn lemma_not_possibly_zero_implies`** — [interval.rs:1064](./src/interval.rs#L1064)
   > If the interval doesn't possibly contain zero, no element is zero.
-- **`proof fn lemma_certainly_lt_implies`** — [interval.rs:1093](./srcinterval.rs#L1093)
+- **`proof fn lemma_certainly_lt_implies`** — [interval.rs:1093](./src/interval.rs#L1093)
   > If a is certainly less than b, then every x in a is less than every y in b.
-- **`proof fn lemma_disjoint_no_common_point`** — [interval.rs:1109](./srcinterval.rs#L1109)
+- **`proof fn lemma_disjoint_no_common_point`** — [interval.rs:1109](./src/interval.rs#L1109)
   > If two intervals are disjoint, they share no common point.
-- **`proof fn lemma_tighten_nonneg_containment`** — [interval.rs:1135](./srcinterval.rs#L1135)
+- **`proof fn lemma_tighten_nonneg_containment`** — [interval.rs:1135](./src/interval.rs#L1135)
   > Tightening to nonneg preserves containment for nonneg elements.
-- **`proof fn lemma_square_wf`** — [interval.rs:1162](./srcinterval.rs#L1162)
+- **`proof fn lemma_square_wf`** — [interval.rs:1162](./src/interval.rs#L1162)
   > Squaring preserves well-formedness.
-- **`proof fn lemma_square_containment`** — [interval.rs:1212](./srcinterval.rs#L1212)
+- **`proof fn lemma_square_containment`** — [interval.rs:1212](./src/interval.rs#L1212)
   > Squaring containment: x in A → x² in square(A).
-- **`proof fn lemma_pow_wf`** — [interval.rs:1327](./srcinterval.rs#L1327)
+- **`proof fn lemma_pow_wf`** — [interval.rs:1327](./src/interval.rs#L1327)
   > Power preserves well-formedness.
-- **`proof fn lemma_pow_containment`** — [interval.rs:1343](./srcinterval.rs#L1343)
+- **`proof fn lemma_pow_containment`** — [interval.rs:1343](./src/interval.rs#L1343)
   > Power containment: x in A → x^n in pow(A, n).
-- **`proof fn lemma_fma_wf`** — [interval.rs:1368](./srcinterval.rs#L1368)
+- **`proof fn lemma_fma_wf`** — [interval.rs:1368](./src/interval.rs#L1368)
   > FMA well-formedness: wf(a) ∧ wf(b) ∧ wf(c) → wf(fma(a,b,c)).
-- **`proof fn lemma_fma_containment`** — [interval.rs:1381](./srcinterval.rs#L1381)
+- **`proof fn lemma_fma_containment`** — [interval.rs:1381](./src/interval.rs#L1381)
   > FMA containment: x in A, y in B, z in C → x*y+z in fma(A,B,C).
-- **`proof fn lemma_add_containment`** — [interval.rs:1479](./srcinterval.rs#L1479)
+- **`proof fn lemma_add_containment`** — [interval.rs:1479](./src/interval.rs#L1479)
   > Addition containment: x in A, y in B => x+y in A+B.
-- **`proof fn lemma_neg_containment`** — [interval.rs:1493](./srcinterval.rs#L1493)
+- **`proof fn lemma_neg_containment`** — [interval.rs:1493](./src/interval.rs#L1493)
   > Negation containment: x in A => -x in -A.
-- **`proof fn lemma_sub_containment`** — [interval.rs:1505](./srcinterval.rs#L1505)
+- **`proof fn lemma_sub_containment`** — [interval.rs:1505](./src/interval.rs#L1505)
   > Subtraction containment: x in A, y in B => x-y in A-B.
-- **`proof fn lemma_mul_containment`** — [interval.rs:1730](./srcinterval.rs#L1730)
+- **`proof fn lemma_mul_containment`** — [interval.rs:1730](./src/interval.rs#L1730)
   > Multiplication containment: x in A, y in B => x*y in A*B.  Proof strategy: two applications of lemma_mul_between. Step 1: Fix y. a.lo <= x <= a.hi => min(a.lo*y, a.hi*y) <= x*y <= max(a.lo*y, a.hi*y). Step 2: Fix a.lo/a.hi. b.lo <= y <= b.hi => each endpoint product is bounded by corners. Step 3: Combine via min4/max4.
-- **`proof fn lemma_scale_containment`** — [interval.rs:2461](./srcinterval.rs#L2461)
+- **`proof fn lemma_scale_containment`** — [interval.rs:2461](./src/interval.rs#L2461)
   > Scalar multiplication containment: x in A => k*x in k*A.
-- **`proof fn lemma_bisect_wf`** — [interval.rs:2582](./srcinterval.rs#L2582)
+- **`proof fn lemma_bisect_wf`** — [interval.rs:2582](./src/interval.rs#L2582)
   > Both halves of a bisection are well-formed.
-- **`proof fn lemma_bisect_covers`** — [interval.rs:2595](./srcinterval.rs#L2595)
+- **`proof fn lemma_bisect_covers`** — [interval.rs:2595](./src/interval.rs#L2595)
   > Bisection covers: x in a → x in left or x in right.
-- **`proof fn lemma_split_at_wf`** — [interval.rs:2616](./srcinterval.rs#L2616)
+- **`proof fn lemma_split_at_wf`** — [interval.rs:2616](./src/interval.rs#L2616)
   > Split at p: both halves are well-formed when lo ≤ p ≤ hi.
-- **`proof fn lemma_split_covers`** — [interval.rs:2628](./srcinterval.rs#L2628)
+- **`proof fn lemma_split_covers`** — [interval.rs:2628](./src/interval.rs#L2628)
   > Split covers: x in a → x in left or x in right.
-- **`proof fn lemma_subdivide_point_zero`** — [interval.rs:2647](./srcinterval.rs#L2647)
+- **`proof fn lemma_subdivide_point_zero`** — [interval.rs:2647](./src/interval.rs#L2647)
   > Subdivision point 0 equals lo.
-- **`proof fn lemma_subdivide_point_n`** — [interval.rs:2683](./srcinterval.rs#L2683)
+- **`proof fn lemma_subdivide_point_n`** — [interval.rs:2683](./src/interval.rs#L2683)
   > Subdivision point n equals hi.
-- **`proof fn lemma_subdivide_points_monotone`** — [interval.rs:2730](./srcinterval.rs#L2730)
+- **`proof fn lemma_subdivide_points_monotone`** — [interval.rs:2730](./src/interval.rs#L2730)
   > Subdivision points are monotone: k1 ≤ k2 → point(k1) ≤ point(k2).
-- **`proof fn lemma_subdivide_piece_wf`** — [interval.rs:2782](./srcinterval.rs#L2782)
+- **`proof fn lemma_subdivide_piece_wf`** — [interval.rs:2782](./src/interval.rs#L2782)
   > Subdivision piece is well-formed.
-- **`proof fn lemma_subdivide_covers`** — [interval.rs:2794](./srcinterval.rs#L2794)
+- **`proof fn lemma_subdivide_covers`** — [interval.rs:2794](./src/interval.rs#L2794)
   > Subdivision covers: x in a → x in some piece.
-- **`proof fn lemma_horner_eval_wf`** — [interval.rs:2953](./srcinterval.rs#L2953)
+- **`proof fn lemma_horner_eval_wf`** — [interval.rs:2953](./src/interval.rs#L2953)
   > Horner evaluation is well-formed.
-- **`proof fn lemma_horner_containment`** — [interval.rs:2975](./srcinterval.rs#L2975)
+- **`proof fn lemma_horner_containment`** — [interval.rs:2975](./src/interval.rs#L2975)
   > Horner containment: x ∈ X → horner(coeffs, x) ∈ horner_eval(coeffs, X).
-- **`proof fn lemma_hausdorff_zero_iff_equal`** — [interval.rs:3040](./srcinterval.rs#L3040)
+- **`proof fn lemma_hausdorff_zero_iff_equal`** — [interval.rs:3040](./src/interval.rs#L3040)
   > Hausdorff distance is zero iff intervals are componentwise equivalent.
-- **`proof fn lemma_hausdorff_triangle`** — [interval.rs:3117](./srcinterval.rs#L3117)
+- **`proof fn lemma_hausdorff_triangle`** — [interval.rs:3117](./src/interval.rs#L3117)
   > Hausdorff triangle inequality: hausdorff(a, c) ≤ hausdorff(a, b) + hausdorff(b, c).
-- **`proof fn lemma_gap_positive_iff_disjoint`** — [interval.rs:3384](./srcinterval.rs#L3384)
+- **`proof fn lemma_gap_positive_iff_disjoint`** — [interval.rs:3384](./src/interval.rs#L3384)
   > Gap is positive iff intervals are disjoint.
-- **`proof fn lemma_gap_bounds_element_distance`** — [interval.rs:3451](./srcinterval.rs#L3451)
+- **`proof fn lemma_gap_bounds_element_distance`** — [interval.rs:3451](./src/interval.rs#L3451)
   > Gap bounds element distance: x ∈ a ∧ y ∈ b → |x - y| ≥ gap(a, b).
-- **`proof fn lemma_point_add_exact`** — [interval.rs:3638](./srcinterval.rs#L3638)
+- **`proof fn lemma_point_add_exact`** — [interval.rs:3638](./src/interval.rs#L3638)
   > Point + Point = Point(sum).
-- **`proof fn lemma_point_neg_exact`** — [interval.rs:3647](./srcinterval.rs#L3647)
+- **`proof fn lemma_point_neg_exact`** — [interval.rs:3647](./src/interval.rs#L3647)
   > Point negation is exact.
-- **`proof fn lemma_point_sub_exact`** — [interval.rs:3656](./srcinterval.rs#L3656)
+- **`proof fn lemma_point_sub_exact`** — [interval.rs:3656](./src/interval.rs#L3656)
   > Point - Point = Point(difference).
-- **`proof fn lemma_point_recip_exact`** — [interval.rs:3665](./srcinterval.rs#L3665)
+- **`proof fn lemma_point_recip_exact`** — [interval.rs:3665](./src/interval.rs#L3665)
   > Point reciprocal is exact.
-- **`proof fn lemma_neg_involution`** — [interval.rs:3676](./srcinterval.rs#L3676)
+- **`proof fn lemma_neg_involution`** — [interval.rs:3676](./src/interval.rs#L3676)
   > Double negation is identity.
-- **`proof fn lemma_add_commutative`** — [interval.rs:3688](./srcinterval.rs#L3688)
+- **`proof fn lemma_add_commutative`** — [interval.rs:3688](./src/interval.rs#L3688)
   > Interval addition is commutative (up to rational equivalence).
 
 ## `interval::Interval`
 
 ### Spec Functions
 
-- **`open spec fn wf_spec`** — [interval.rs:17](./srcinterval.rs#L17)
+- **`open spec fn wf_spec`** — [interval.rs:17](./src/interval.rs#L17)
   > Well-formedness: the interval is non-empty (lo <= hi).
-- **`open spec fn contains_spec`** — [interval.rs:22](./srcinterval.rs#L22)
+- **`open spec fn contains_spec`** — [interval.rs:22](./src/interval.rs#L22)
   > Point containment: lo <= x <= hi.
-- **`open spec fn contains_interval_spec`** — [interval.rs:27](./srcinterval.rs#L27)
+- **`open spec fn contains_interval_spec`** — [interval.rs:27](./src/interval.rs#L27)
   > Sub-interval containment: self contains other entirely.
-- **`open spec fn width_spec`** — [interval.rs:32](./srcinterval.rs#L32)
+- **`open spec fn width_spec`** — [interval.rs:32](./src/interval.rs#L32)
   > Interval width: hi - lo.
-- **`open spec fn midpoint_spec`** — [interval.rs:37](./srcinterval.rs#L37)
+- **`open spec fn midpoint_spec`** — [interval.rs:37](./src/interval.rs#L37)
   > Interval midpoint: (lo + hi) / 2.
-- **`open spec fn is_point_spec`** — [interval.rs:42](./srcinterval.rs#L42)
+- **`open spec fn is_point_spec`** — [interval.rs:42](./src/interval.rs#L42)
   > Degenerate (point) interval: lo and hi represent the same value.
-- **`open spec fn from_point_spec`** — [interval.rs:47](./srcinterval.rs#L47)
+- **`open spec fn from_point_spec`** — [interval.rs:47](./src/interval.rs#L47)
   > Construct a point interval [x, x] (spec-level).
-- **`open spec fn overlap_spec`** — [interval.rs:52](./srcinterval.rs#L52)
+- **`open spec fn overlap_spec`** — [interval.rs:52](./src/interval.rs#L52)
   > Two intervals overlap (share at least one point).
-- **`open spec fn hull_spec`** — [interval.rs:57](./srcinterval.rs#L57)
+- **`open spec fn hull_spec`** — [interval.rs:57](./src/interval.rs#L57)
   > Convex hull: smallest interval containing both self and other.
-- **`open spec fn intersect_spec`** — [interval.rs:66](./srcinterval.rs#L66)
+- **`open spec fn intersect_spec`** — [interval.rs:66](./src/interval.rs#L66)
   > Intersection: largest interval contained in both self and other. Returns None if the intervals don't overlap.
-- **`open spec fn certainly_positive_spec`** — [interval.rs:79](./srcinterval.rs#L79)
+- **`open spec fn certainly_positive_spec`** — [interval.rs:79](./src/interval.rs#L79)
   > The interval is entirely positive: lo > 0.
-- **`open spec fn certainly_negative_spec`** — [interval.rs:84](./srcinterval.rs#L84)
+- **`open spec fn certainly_negative_spec`** — [interval.rs:84](./src/interval.rs#L84)
   > The interval is entirely negative: hi < 0.
-- **`open spec fn certainly_zero_spec`** — [interval.rs:89](./srcinterval.rs#L89)
+- **`open spec fn certainly_zero_spec`** — [interval.rs:89](./src/interval.rs#L89)
   > The interval is certainly zero: degenerate point at 0.
-- **`open spec fn certainly_nonneg_spec`** — [interval.rs:94](./srcinterval.rs#L94)
+- **`open spec fn certainly_nonneg_spec`** — [interval.rs:94](./src/interval.rs#L94)
   > The interval is entirely nonneg: lo >= 0.
-- **`open spec fn certainly_nonpos_spec`** — [interval.rs:99](./srcinterval.rs#L99)
+- **`open spec fn certainly_nonpos_spec`** — [interval.rs:99](./src/interval.rs#L99)
   > The interval is entirely nonpos: hi <= 0.
-- **`open spec fn possibly_zero_spec`** — [interval.rs:104](./srcinterval.rs#L104)
+- **`open spec fn possibly_zero_spec`** — [interval.rs:104](./src/interval.rs#L104)
   > The interval possibly contains zero: lo <= 0 <= hi.
-- **`open spec fn sign_definite_spec`** — [interval.rs:111](./srcinterval.rs#L111)
+- **`open spec fn sign_definite_spec`** — [interval.rs:111](./src/interval.rs#L111)
   > Sign determination: Some(1) if positive, Some(-1) if negative, Some(0) if certainly zero, None if indeterminate.
-- **`open spec fn certainly_lt_spec`** — [interval.rs:124](./srcinterval.rs#L124)
+- **`open spec fn certainly_lt_spec`** — [interval.rs:124](./src/interval.rs#L124)
   > self is certainly less than rhs: self.hi < rhs.lo.
-- **`open spec fn certainly_le_spec`** — [interval.rs:129](./srcinterval.rs#L129)
+- **`open spec fn certainly_le_spec`** — [interval.rs:129](./src/interval.rs#L129)
   > self is certainly <= rhs: self.hi <= rhs.lo.
-- **`open spec fn certainly_equal_spec`** — [interval.rs:134](./srcinterval.rs#L134)
+- **`open spec fn certainly_equal_spec`** — [interval.rs:134](./src/interval.rs#L134)
   > Both intervals are the same point.
-- **`open spec fn possibly_lt_spec`** — [interval.rs:139](./srcinterval.rs#L139)
+- **`open spec fn possibly_lt_spec`** — [interval.rs:139](./src/interval.rs#L139)
   > It's possible that some x in self is less than some y in rhs.
-- **`open spec fn disjoint_spec`** — [interval.rs:144](./srcinterval.rs#L144)
+- **`open spec fn disjoint_spec`** — [interval.rs:144](./src/interval.rs#L144)
   > The intervals are disjoint: self.hi < rhs.lo or rhs.hi < self.lo.
-- **`open spec fn tighten_nonneg_spec`** — [interval.rs:151](./srcinterval.rs#L151)
+- **`open spec fn tighten_nonneg_spec`** — [interval.rs:151](./src/interval.rs#L151)
   > Tighten to nonneg: clamp lo to max(0, lo).
-- **`open spec fn tighten_nonpos_spec`** — [interval.rs:159](./srcinterval.rs#L159)
+- **`open spec fn tighten_nonpos_spec`** — [interval.rs:159](./src/interval.rs#L159)
   > Tighten to nonpos: clamp hi to min(0, hi).
-- **`open spec fn tighten_positive_spec`** — [interval.rs:167](./srcinterval.rs#L167)
+- **`open spec fn tighten_positive_spec`** — [interval.rs:167](./src/interval.rs#L167)
   > Tighten to positive: clamp lo to max(0, lo), requires hi > 0.
-- **`open spec fn square_spec`** — [interval.rs:177](./srcinterval.rs#L177)
+- **`open spec fn square_spec`** — [interval.rs:177](./src/interval.rs#L177)
   > Squaring: tighter than mul(a, a) because it exploits x² ≥ 0.
-- **`open spec fn pow_spec`** — [interval.rs:202](./srcinterval.rs#L202)
+- **`open spec fn pow_spec`** — [interval.rs:202](./src/interval.rs#L202)
   > Integer power: [a,b]^n (naive recursive via mul for simplicity).
-- **`open spec fn fma_spec`** — [interval.rs:213](./srcinterval.rs#L213)
+- **`open spec fn fma_spec`** — [interval.rs:213](./src/interval.rs#L213)
   > Fused multiply-add: a*b + c (no intermediate interval rounding).
-- **`open spec fn add_spec`** — [interval.rs:220](./srcinterval.rs#L220)
+- **`open spec fn add_spec`** — [interval.rs:220](./src/interval.rs#L220)
   > Addition: [a,b] + [c,d] = [a+c, b+d].
-- **`open spec fn neg_spec`** — [interval.rs:228](./srcinterval.rs#L228)
+- **`open spec fn neg_spec`** — [interval.rs:228](./src/interval.rs#L228)
   > Negation: -[a,b] = [-b, -a].
-- **`open spec fn sub_spec`** — [interval.rs:236](./srcinterval.rs#L236)
+- **`open spec fn sub_spec`** — [interval.rs:236](./src/interval.rs#L236)
   > Subtraction: [a,b] - [c,d] = [a-d, b-c].
-- **`open spec fn mul_spec`** — [interval.rs:244](./srcinterval.rs#L244)
+- **`open spec fn mul_spec`** — [interval.rs:244](./src/interval.rs#L244)
   > Multiplication: [a,b] * [c,d] = [min(ac,ad,bc,bd), max(ac,ad,bc,bd)].
-- **`open spec fn scale_spec`** — [interval.rs:256](./srcinterval.rs#L256)
+- **`open spec fn scale_spec`** — [interval.rs:256](./src/interval.rs#L256)
   > Scalar multiplication: k * [a,b] = [min(k*a, k*b), max(k*a, k*b)].
-- **`open spec fn abs_spec`** — [interval.rs:266](./srcinterval.rs#L266)
+- **`open spec fn abs_spec`** — [interval.rs:266](./src/interval.rs#L266)
   > Absolute value: |[a,b]|.
-- **`open spec fn recip_spec`** — [interval.rs:281](./srcinterval.rs#L281)
+- **`open spec fn recip_spec`** — [interval.rs:281](./src/interval.rs#L281)
   > Reciprocal: 1/[a,b] = [1/b, 1/a] (defined when 0 not in [a,b]).
-- **`open spec fn div_spec`** — [interval.rs:289](./srcinterval.rs#L289)
+- **`open spec fn div_spec`** — [interval.rs:289](./src/interval.rs#L289)
   > Division: [a,b] / [c,d] = [a,b] * (1/[c,d]) (defined when 0 not in [c,d]).
 
 ### Proof Functions
 
-- **`proof fn from_point`** — [interval.rs:296](./srcinterval.rs#L296)
+- **`proof fn from_point`** — [interval.rs:296](./src/interval.rs#L296)
   > Construct a point interval (proof-level).
-- **`proof fn from_endpoints`** — [interval.rs:304](./srcinterval.rs#L304)
+- **`proof fn from_endpoints`** — [interval.rs:304](./src/interval.rs#L304)
   > Construct an interval from ordered endpoints (proof-level).
-- **`proof fn lemma_from_point_wf`** — [interval.rs:318](./srcinterval.rs#L318)
+- **`proof fn lemma_from_point_wf`** — [interval.rs:318](./src/interval.rs#L318)
   > A point interval is well-formed.
-- **`proof fn lemma_from_point_contains`** — [interval.rs:325](./srcinterval.rs#L325)
+- **`proof fn lemma_from_point_contains`** — [interval.rs:325](./src/interval.rs#L325)
   > A point interval contains its point.
-- **`proof fn lemma_contains_lo`** — [interval.rs:332](./srcinterval.rs#L332)
+- **`proof fn lemma_contains_lo`** — [interval.rs:332](./src/interval.rs#L332)
   > A well-formed interval contains its lower bound.
-- **`proof fn lemma_contains_hi`** — [interval.rs:341](./srcinterval.rs#L341)
+- **`proof fn lemma_contains_hi`** — [interval.rs:341](./src/interval.rs#L341)
   > A well-formed interval contains its upper bound.
-- **`proof fn lemma_add_wf`** — [interval.rs:352](./srcinterval.rs#L352)
+- **`proof fn lemma_add_wf`** — [interval.rs:352](./src/interval.rs#L352)
   > Addition preserves well-formedness.
-- **`proof fn lemma_neg_wf`** — [interval.rs:363](./srcinterval.rs#L363)
+- **`proof fn lemma_neg_wf`** — [interval.rs:363](./src/interval.rs#L363)
   > Negation preserves well-formedness.
-- **`proof fn lemma_sub_wf`** — [interval.rs:373](./srcinterval.rs#L373)
+- **`proof fn lemma_sub_wf`** — [interval.rs:373](./src/interval.rs#L373)
   > Subtraction preserves well-formedness.
-- **`proof fn lemma_mul_wf`** — [interval.rs:387](./srcinterval.rs#L387)
+- **`proof fn lemma_mul_wf`** — [interval.rs:387](./src/interval.rs#L387)
   > Multiplication preserves well-formedness.
-- **`proof fn lemma_scale_wf`** — [interval.rs:404](./srcinterval.rs#L404)
+- **`proof fn lemma_scale_wf`** — [interval.rs:404](./src/interval.rs#L404)
   > Scale preserves well-formedness.
-- **`proof fn lemma_abs_wf`** — [interval.rs:427](./srcinterval.rs#L427)
+- **`proof fn lemma_abs_wf`** — [interval.rs:427](./src/interval.rs#L427)
   > Absolute value preserves well-formedness.
-- **`proof fn lemma_abs_containment`** — [interval.rs:451](./srcinterval.rs#L451)
+- **`proof fn lemma_abs_containment`** — [interval.rs:451](./src/interval.rs#L451)
   > Absolute value containment: x in A => |x| in |A|.
 
 ## `runtime_interval`
 
 ### Spec Functions
 
-- **`open spec fn wf_spec`** — [runtime_interval.rs:33](./srcruntime_interval.rs#L33)
+- **`open spec fn wf_spec`** — [runtime_interval.rs:33](./src/runtime_interval.rs#L33)
   > Well-formedness invariant tying runtime witnesses to the ghost model.
 
 ### Exec Functions
 
-- **`exec fn from_endpoints`** — [runtime_interval.rs:43](./srcruntime_interval.rs#L43)
+- **`exec fn from_endpoints`** — [runtime_interval.rs:43](./src/runtime_interval.rs#L43)
   > Construct an interval from ordered endpoints [lo, hi]. Takes ownership of both RuntimeRationals.
-- **`exec fn from_point`** — [runtime_interval.rs:64](./srcruntime_interval.rs#L64)
+- **`exec fn from_point`** — [runtime_interval.rs:64](./src/runtime_interval.rs#L64)
   > Construct a point interval [x, x] from a single rational.
-- **`exec fn add`** — [runtime_interval.rs:93](./srcruntime_interval.rs#L93)
+- **`exec fn add`** — [runtime_interval.rs:93](./src/runtime_interval.rs#L93)
   > Addition: [a,b] + [c,d] = [a+c, b+d].
-- **`exec fn neg`** — [runtime_interval.rs:116](./srcruntime_interval.rs#L116)
+- **`exec fn neg`** — [runtime_interval.rs:116](./src/runtime_interval.rs#L116)
   > Negation: -[a,b] = [-b, -a].
-- **`exec fn sub`** — [runtime_interval.rs:138](./srcruntime_interval.rs#L138)
+- **`exec fn sub`** — [runtime_interval.rs:138](./src/runtime_interval.rs#L138)
   > Subtraction: [a,b] - [c,d] = [a-d, b-c].
-- **`exec fn mul`** — [runtime_interval.rs:161](./srcruntime_interval.rs#L161)
+- **`exec fn mul`** — [runtime_interval.rs:161](./src/runtime_interval.rs#L161)
   > Multiplication: [a,b] * [c,d] = [min(ac,ad,bc,bd), max(ac,ad,bc,bd)].
-- **`exec fn scale`** — [runtime_interval.rs:197](./srcruntime_interval.rs#L197)
+- **`exec fn scale`** — [runtime_interval.rs:197](./src/runtime_interval.rs#L197)
   > Scalar multiplication: k * [a,b].
-- **`exec fn abs`** — [runtime_interval.rs:222](./srcruntime_interval.rs#L222)
+- **`exec fn abs`** — [runtime_interval.rs:222](./src/runtime_interval.rs#L222)
   > Absolute value: |[a,b]|.
-- **`exec fn recip`** — [runtime_interval.rs:280](./srcruntime_interval.rs#L280)
+- **`exec fn recip`** — [runtime_interval.rs:280](./src/runtime_interval.rs#L280)
   > Reciprocal: 1/[a,b] = [1/b, 1/a]. Requires 0 not in the interval (entirely positive or entirely negative).
-- **`exec fn div`** — [runtime_interval.rs:352](./srcruntime_interval.rs#L352)
+- **`exec fn div`** — [runtime_interval.rs:352](./src/runtime_interval.rs#L352)
   > Division: [a,b] / [c,d] = [a,b] * (1/[c,d]). Requires 0 not in the divisor interval.
-- **`exec fn intersect`** — [runtime_interval.rs:374](./srcruntime_interval.rs#L374)
+- **`exec fn intersect`** — [runtime_interval.rs:374](./src/runtime_interval.rs#L374)
   > Intersection of two intervals. Returns None if they don't overlap, Some(result) otherwise.
-- **`exec fn certainly_positive`** — [runtime_interval.rs:406](./srcruntime_interval.rs#L406)
+- **`exec fn certainly_positive`** — [runtime_interval.rs:406](./src/runtime_interval.rs#L406)
   > Is the interval certainly positive? (lo > 0)
-- **`exec fn certainly_negative`** — [runtime_interval.rs:415](./srcruntime_interval.rs#L415)
+- **`exec fn certainly_negative`** — [runtime_interval.rs:415](./src/runtime_interval.rs#L415)
   > Is the interval certainly negative? (hi < 0)
-- **`exec fn certainly_zero`** — [runtime_interval.rs:424](./srcruntime_interval.rs#L424)
+- **`exec fn certainly_zero`** — [runtime_interval.rs:424](./src/runtime_interval.rs#L424)
   > Is the interval certainly zero? (point at 0)
-- **`exec fn certainly_nonneg`** — [runtime_interval.rs:433](./srcruntime_interval.rs#L433)
+- **`exec fn certainly_nonneg`** — [runtime_interval.rs:433](./src/runtime_interval.rs#L433)
   > Is the interval certainly nonneg? (lo >= 0)
-- **`exec fn certainly_nonpos`** — [runtime_interval.rs:442](./srcruntime_interval.rs#L442)
+- **`exec fn certainly_nonpos`** — [runtime_interval.rs:442](./src/runtime_interval.rs#L442)
   > Is the interval certainly nonpos? (hi <= 0)
-- **`exec fn possibly_zero`** — [runtime_interval.rs:451](./srcruntime_interval.rs#L451)
+- **`exec fn possibly_zero`** — [runtime_interval.rs:451](./src/runtime_interval.rs#L451)
   > Does the interval possibly contain zero? (lo <= 0 <= hi)
-- **`exec fn sign_definite`** — [runtime_interval.rs:460](./srcruntime_interval.rs#L460)
+- **`exec fn sign_definite`** — [runtime_interval.rs:460](./src/runtime_interval.rs#L460)
   > Sign determination: 1 if positive, -1 if negative, 0 if zero, None if indeterminate.
-- **`exec fn certainly_lt`** — [runtime_interval.rs:476](./srcruntime_interval.rs#L476)
+- **`exec fn certainly_lt`** — [runtime_interval.rs:476](./src/runtime_interval.rs#L476)
   > Is self certainly less than rhs? (self.hi < rhs.lo)
-- **`exec fn certainly_le`** — [runtime_interval.rs:484](./srcruntime_interval.rs#L484)
+- **`exec fn certainly_le`** — [runtime_interval.rs:484](./src/runtime_interval.rs#L484)
   > Is self certainly <= rhs? (self.hi <= rhs.lo)
-- **`exec fn certainly_equal`** — [runtime_interval.rs:492](./srcruntime_interval.rs#L492)
+- **`exec fn certainly_equal`** — [runtime_interval.rs:492](./src/runtime_interval.rs#L492)
   > Are both intervals the same point?
-- **`exec fn possibly_lt`** — [runtime_interval.rs:500](./srcruntime_interval.rs#L500)
+- **`exec fn possibly_lt`** — [runtime_interval.rs:500](./src/runtime_interval.rs#L500)
   > Is it possible that some x in self < some y in rhs? (self.lo < rhs.hi)
-- **`exec fn disjoint`** — [runtime_interval.rs:508](./srcruntime_interval.rs#L508)
+- **`exec fn disjoint`** — [runtime_interval.rs:508](./src/runtime_interval.rs#L508)
   > Are the intervals disjoint?
-- **`exec fn tighten_nonneg`** — [runtime_interval.rs:516](./srcruntime_interval.rs#L516)
+- **`exec fn tighten_nonneg`** — [runtime_interval.rs:516](./src/runtime_interval.rs#L516)
   > Tighten to nonneg: clamp lo to max(0, lo).
-- **`exec fn tighten_nonpos`** — [runtime_interval.rs:547](./srcruntime_interval.rs#L547)
+- **`exec fn tighten_nonpos`** — [runtime_interval.rs:547](./src/runtime_interval.rs#L547)
   > Tighten to nonpos: clamp hi to min(0, hi).
-- **`exec fn square`** — [runtime_interval.rs:577](./srcruntime_interval.rs#L577)
+- **`exec fn square`** — [runtime_interval.rs:577](./src/runtime_interval.rs#L577)
   > Squaring: tighter than mul(self, self).
-- **`exec fn pow`** — [runtime_interval.rs:631](./srcruntime_interval.rs#L631)
+- **`exec fn pow`** — [runtime_interval.rs:631](./src/runtime_interval.rs#L631)
   > Integer power (naive recursive).
-- **`exec fn fma`** — [runtime_interval.rs:653](./srcruntime_interval.rs#L653)
+- **`exec fn fma`** — [runtime_interval.rs:653](./src/runtime_interval.rs#L653)
   > Fused multiply-add: self * mul_rhs + add_rhs.
-- **`exec fn bisect`** — [runtime_interval.rs:668](./srcruntime_interval.rs#L668)
+- **`exec fn bisect`** — [runtime_interval.rs:668](./src/runtime_interval.rs#L668)
   > Bisect at midpoint: returns ([lo, mid], [mid, hi]).
-- **`exec fn split_at`** — [runtime_interval.rs:713](./srcruntime_interval.rs#L713)
+- **`exec fn split_at`** — [runtime_interval.rs:713](./src/runtime_interval.rs#L713)
   > Split at an arbitrary rational point p where lo ≤ p ≤ hi.
-- **`exec fn has_sign_change`** — [runtime_interval.rs:764](./srcruntime_interval.rs#L764)
+- **`exec fn has_sign_change`** — [runtime_interval.rs:764](./src/runtime_interval.rs#L764)
   > Check if two function values indicate a sign change.
-- **`exec fn scalar_newton_step`** — [runtime_interval.rs:778](./srcruntime_interval.rs#L778)
+- **`exec fn scalar_newton_step`** — [runtime_interval.rs:778](./src/runtime_interval.rs#L778)
   > Scalar interval Newton step: N(X) = x_mid - f(x_mid)/f'(X) ∩ X. Returns None if f'(X) contains zero or intersection is empty.
 
