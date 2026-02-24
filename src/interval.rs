@@ -2566,6 +2566,7 @@ impl Interval {
         self.lo.add_spec(step)
     }
 
+    /// The k-th piece of an n-way uniform subdivision.
     pub open spec fn subdivide_piece_spec(self, n: nat, k: nat) -> Interval
         recommends n > 0, k < n,
     {
