@@ -12,18 +12,19 @@
   > Split at an arbitrary rational point p in [lo, hi].
 - **`open spec fn subdivide_point_spec`** — [interval.rs:2560](./src/interval.rs#L2560)
   > N-way uniform subdivision: n equal-width pieces. Piece k = [lo + k*(hi-lo)/n, lo + (k+1)*(hi-lo)/n].
-- **`open spec fn subdivide_piece_spec`** — [interval.rs:2569](./src/interval.rs#L2569)
-- **`open spec fn sign_change_spec`** — [interval.rs:2908](./src/interval.rs#L2908)
+- **`open spec fn subdivide_piece_spec`** — [interval.rs:2570](./src/interval.rs#L2570)
+  > The k-th piece of an n-way uniform subdivision.
+- **`open spec fn sign_change_spec`** — [interval.rs:2909](./src/interval.rs#L2909)
   > Whether two values have opposite signs (one positive, one negative).
-- **`open spec fn scalar_newton_step_spec`** — [interval.rs:2917](./src/interval.rs#L2917)
+- **`open spec fn scalar_newton_step_spec`** — [interval.rs:2918](./src/interval.rs#L2918)
   > N(X) = x_mid - f(x_mid)/f'(X) ∩ X. Returns None if f'(X) contains zero (division undefined).
-- **`open spec fn horner_eval_spec`** — [interval.rs:2939](./src/interval.rs#L2939)
+- **`open spec fn horner_eval_spec`** — [interval.rs:2940](./src/interval.rs#L2940)
   > Evaluate polynomial over an interval using Horner's method. coeffs = [c₀, c₁, ..., cₙ], result encloses all p(x) for x ∈ X. p(x) = c₀ + c₁x + c₂x² + ... = c₀ + x*(c₁ + x*(c₂ + ...))
-- **`open spec fn poly_derivative_coeffs_spec`** — [interval.rs:3017](./src/interval.rs#L3017)
+- **`open spec fn poly_derivative_coeffs_spec`** — [interval.rs:3018](./src/interval.rs#L3018)
   > Compute derivative polynomial coefficients. If p(x) = c₀ + c₁x + c₂x² + ..., then p'(x) = c₁ + 2c₂x + 3c₃x² + ... Output: [c₁, 2*c₂, 3*c₃, ...]
-- **`open spec fn hausdorff_spec`** — [interval.rs:3033](./src/interval.rs#L3033)
+- **`open spec fn hausdorff_spec`** — [interval.rs:3034](./src/interval.rs#L3034)
   > Hausdorff distance between two intervals. max(|lo₁ - lo₂|, |hi₁ - hi₂|)
-- **`open spec fn gap_spec`** — [interval.rs:3375](./src/interval.rs#L3375)
+- **`open spec fn gap_spec`** — [interval.rs:3376](./src/interval.rs#L3376)
   > Gap (separation) between two intervals. Positive iff the intervals are disjoint.
 
 ### Proof Functions
@@ -102,35 +103,35 @@
   > Multiplication containment: x in A, y in B => x*y in A*B.  Proof strategy: two applications of lemma_mul_between. Step 1: Fix y. a.lo <= x <= a.hi => min(a.lo*y, a.hi*y) <= x*y <= max(a.lo*y, a.hi*y). Step 2: Fix a.lo/a.hi. b.lo <= y <= b.hi => each endpoint product is bounded by corners. Step 3: Combine via min4/max4.
 - **`proof fn lemma_scale_containment`** — [interval.rs:2461](./src/interval.rs#L2461)
   > Scalar multiplication containment: x in A => k*x in k*A.
-- **`proof fn lemma_bisect_wf`** — [interval.rs:2581](./src/interval.rs#L2581)
+- **`proof fn lemma_bisect_wf`** — [interval.rs:2582](./src/interval.rs#L2582)
   > Both halves of a bisection are well-formed.
-- **`proof fn lemma_bisect_covers`** — [interval.rs:2594](./src/interval.rs#L2594)
+- **`proof fn lemma_bisect_covers`** — [interval.rs:2595](./src/interval.rs#L2595)
   > Bisection covers: x in a → x in left or x in right.
-- **`proof fn lemma_split_at_wf`** — [interval.rs:2615](./src/interval.rs#L2615)
+- **`proof fn lemma_split_at_wf`** — [interval.rs:2616](./src/interval.rs#L2616)
   > Split at p: both halves are well-formed when lo ≤ p ≤ hi.
-- **`proof fn lemma_split_covers`** — [interval.rs:2627](./src/interval.rs#L2627)
+- **`proof fn lemma_split_covers`** — [interval.rs:2628](./src/interval.rs#L2628)
   > Split covers: x in a → x in left or x in right.
-- **`proof fn lemma_subdivide_point_zero`** — [interval.rs:2646](./src/interval.rs#L2646)
+- **`proof fn lemma_subdivide_point_zero`** — [interval.rs:2647](./src/interval.rs#L2647)
   > Subdivision point 0 equals lo.
-- **`proof fn lemma_subdivide_point_n`** — [interval.rs:2682](./src/interval.rs#L2682)
+- **`proof fn lemma_subdivide_point_n`** — [interval.rs:2683](./src/interval.rs#L2683)
   > Subdivision point n equals hi.
-- **`proof fn lemma_subdivide_points_monotone`** — [interval.rs:2729](./src/interval.rs#L2729)
+- **`proof fn lemma_subdivide_points_monotone`** — [interval.rs:2730](./src/interval.rs#L2730)
   > Subdivision points are monotone: k1 ≤ k2 → point(k1) ≤ point(k2).
-- **`proof fn lemma_subdivide_piece_wf`** — [interval.rs:2781](./src/interval.rs#L2781)
+- **`proof fn lemma_subdivide_piece_wf`** — [interval.rs:2782](./src/interval.rs#L2782)
   > Subdivision piece is well-formed.
-- **`proof fn lemma_subdivide_covers`** — [interval.rs:2793](./src/interval.rs#L2793)
+- **`proof fn lemma_subdivide_covers`** — [interval.rs:2794](./src/interval.rs#L2794)
   > Subdivision covers: x in a → x in some piece.
-- **`proof fn lemma_horner_eval_wf`** — [interval.rs:2952](./src/interval.rs#L2952)
+- **`proof fn lemma_horner_eval_wf`** — [interval.rs:2953](./src/interval.rs#L2953)
   > Horner evaluation is well-formed.
-- **`proof fn lemma_horner_containment`** — [interval.rs:2974](./src/interval.rs#L2974)
+- **`proof fn lemma_horner_containment`** — [interval.rs:2975](./src/interval.rs#L2975)
   > Horner containment: x ∈ X → horner(coeffs, x) ∈ horner_eval(coeffs, X).
-- **`proof fn lemma_hausdorff_zero_iff_equal`** — [interval.rs:3039](./src/interval.rs#L3039)
+- **`proof fn lemma_hausdorff_zero_iff_equal`** — [interval.rs:3040](./src/interval.rs#L3040)
   > Hausdorff distance is zero iff intervals are componentwise equivalent.
-- **`proof fn lemma_hausdorff_triangle`** — [interval.rs:3116](./src/interval.rs#L3116)
+- **`proof fn lemma_hausdorff_triangle`** — [interval.rs:3117](./src/interval.rs#L3117)
   > Hausdorff triangle inequality: hausdorff(a, c) ≤ hausdorff(a, b) + hausdorff(b, c).
-- **`proof fn lemma_gap_positive_iff_disjoint`** — [interval.rs:3383](./src/interval.rs#L3383)
+- **`proof fn lemma_gap_positive_iff_disjoint`** — [interval.rs:3384](./src/interval.rs#L3384)
   > Gap is positive iff intervals are disjoint.
-- **`proof fn lemma_gap_bounds_element_distance`** — [interval.rs:3450](./src/interval.rs#L3450)
+- **`proof fn lemma_gap_bounds_element_distance`** — [interval.rs:3451](./src/interval.rs#L3451)
   > Gap bounds element distance: x ∈ a ∧ y ∈ b → |x - y| ≥ gap(a, b).
 
 ## `interval::Interval`
