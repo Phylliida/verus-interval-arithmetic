@@ -896,6 +896,7 @@ impl RuntimeInterval {
 
     // ── Phase 8: Distance & Metric ──
 
+    /// Hausdorff distance: max(|lo₁ - lo₂|, |hi₁ - hi₂|).
     pub fn hausdorff(&self, other: &Self) -> (out: RuntimeRational)
         requires
             self.wf_spec(),
