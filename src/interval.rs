@@ -3296,94 +3296,45 @@ impl Interval {
         ensures
             a.sub_spec(b).add_spec(b.sub_spec(c)).eqv_spec(a.sub_spec(c)),
     {
-        // (a - b) + (b - c)
-        // = (a + (-b)) + (b + (-c))
-        let ab = a.sub_spec(b); // a + (-b)
-        let bc = b.sub_spec(c); // b + (-c)
-        let sum = ab.add_spec(bc);
-        let target = a.sub_spec(c);
-
-        // Use cross-multiplication to show eqv.
-        // sum.num * target.denom() == target.num * sum.denom()
-        // This is a concrete identity about the Rational struct fields.
-        // sub_spec(a, b) = a.add_spec(b.neg_spec())
-        // Expanding is complex but the SMT solver with nonlinear_arith can handle it
-        // if we give it the right structural equalities.
-
-        Rational::lemma_add_denom_product_int(ab, bc);
-        Rational::lemma_add_denom_product_int(a, b.neg_spec());
-        Rational::lemma_add_denom_product_int(b, c.neg_spec());
-        Rational::lemma_add_denom_product_int(a, c.neg_spec());
-        Rational::lemma_denom_positive(a);
-        Rational::lemma_denom_positive(b);
-        Rational::lemma_denom_positive(c);
-
-        let da = a.denom();
-        let db = b.denom();
-        let dc = c.denom();
         let nb = b.neg_spec();
         let nc = c.neg_spec();
+        let zero = Rational::from_int_spec(0);
 
-        assert(nb.num == -b.num);
-        assert(nb.denom() == db);
-        assert(nc.num == -c.num);
-        assert(nc.denom() == dc);
+        // 1. (a+nb) + (b+nc) ≡ a + (nb + (b+nc))
+        Rational::lemma_add_associative(a, nb, b.add_spec(nc));
 
-        // ab = a + (-b), ab.num = a.num * db + (-b.num) * da = a.num * db - b.num * da
-        // ab.denom() = da * db
-        assert(ab.num == a.num * db + nb.num * da);
-        assert(ab.denom() == da * db);
-        // bc = b + (-c), bc.num = b.num * dc + (-c.num) * db = b.num * dc - c.num * db
-        // bc.denom() = db * dc
-        assert(bc.num == b.num * dc + nc.num * db);
-        assert(bc.denom() == db * dc);
-        // sum = ab + bc
-        // sum.num = ab.num * bc.denom() + bc.num * ab.denom()
-        //         = (a.num*db - b.num*da) * (db*dc) + (b.num*dc - c.num*db) * (da*db)
-        // sum.denom() = ab.denom() * bc.denom() = (da*db) * (db*dc)
-        assert(sum.num == ab.num * bc.denom() + bc.num * ab.denom());
-        assert(sum.denom() == ab.denom() * bc.denom());
+        // 2. nb + (b+nc) ≡ (nb+b) + nc  (associativity, flipped)
+        Rational::lemma_add_associative(nb, b, nc);
+        Rational::lemma_eqv_symmetric(
+            nb.add_spec(b).add_spec(nc),
+            nb.add_spec(b.add_spec(nc)));
 
-        // target = a + (-c)
-        // target.num = a.num * dc + (-c.num) * da = a.num * dc - c.num * da
-        // target.denom() = da * dc
-        assert(target.num == a.num * dc + nc.num * da);
-        assert(target.denom() == da * dc);
+        // 3. nb + b ≡ 0
+        Rational::lemma_add_commutative(nb, b);
+        Rational::lemma_sub_self(b);
+        Rational::lemma_eqv_transitive(nb.add_spec(b), b.add_spec(nb), zero);
 
-        // Need: sum.num * target.denom() == target.num * sum.denom()
-        // Stage 1: substitute negations to expose cancellation structure
-        assert(sum.num ==
-            (a.num * db - b.num * da) * (db * dc)
-            + (b.num * dc - c.num * db) * (da * db))
-            by (nonlinear_arith)
-            requires
-                ab.num == a.num * db + nb.num * da,
-                bc.num == b.num * dc + nc.num * db,
-                sum.num == ab.num * (db * dc) + bc.num * (da * db),
-                nb.num == -b.num,
-                nc.num == -c.num,
-        ;
-        // Stage 2: expand each product and cancel b-terms
-        assert((a.num * db - b.num * da) * (db * dc)
-            == a.num * db * db * dc - b.num * da * db * dc)
-            by (nonlinear_arith);
-        assert((b.num * dc - c.num * db) * (da * db)
-            == b.num * da * db * dc - c.num * da * db * db)
-            by (nonlinear_arith);
-        assert(a.num * db * db * dc - b.num * da * db * dc
-            + (b.num * da * db * dc - c.num * da * db * db)
-            == db * db * (a.num * dc - c.num * da))
-            by (nonlinear_arith);
-        // Stage 3: cross-multiply using factored form
-        assert(sum.num * target.denom() == target.num * sum.denom())
-            by (nonlinear_arith)
-            requires
-                sum.num == db * db * (a.num * dc - c.num * da),
-                sum.denom() == (da * db) * (db * dc),
-                target.num == a.num * dc + nc.num * da,
-                target.denom() == da * dc,
-                nc.num == -c.num,
-        ;
+        // 4. (nb+b) + nc ≡ 0 + nc
+        Rational::lemma_eqv_add_congruence_left(nb.add_spec(b), zero, nc);
+
+        // 5. 0 + nc == nc  (structural)
+        Rational::lemma_add_zero_identity(nc);
+
+        // Chain inner: nb+(b+nc) ≡ (nb+b)+nc ≡ 0+nc == nc
+        Rational::lemma_eqv_transitive(
+            nb.add_spec(b).add_spec(nc), zero.add_spec(nc), nc);
+        Rational::lemma_eqv_transitive(
+            nb.add_spec(b.add_spec(nc)), nb.add_spec(b).add_spec(nc), nc);
+
+        // Lift: a + (nb+(b+nc)) ≡ a + nc
+        Rational::lemma_eqv_add_congruence_right(
+            a, nb.add_spec(b.add_spec(nc)), nc);
+
+        // Final: (a+nb)+(b+nc) ≡ a+(nb+(b+nc)) ≡ a+nc
+        Rational::lemma_eqv_transitive(
+            a.add_spec(nb).add_spec(b.add_spec(nc)),
+            a.add_spec(nb.add_spec(b.add_spec(nc))),
+            a.add_spec(nc));
     }
 
     // ── 8.2 Gap between disjoint intervals ──
