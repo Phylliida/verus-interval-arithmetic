@@ -3622,6 +3622,86 @@ impl Interval {
                 zero.denom() == 1int,
         ;
     }
+
+    // ── Correctness characterization proofs ──────────────────────
+    //
+    // Properties that could only hold if the spec‐function formulas are
+    // actually correct.  If someone introduced a bug (swapped endpoints,
+    // wrong sign, wrong case split), these proofs would fail to verify.
+
+    // ── Category 1: Point interval exactness ─────────────────────
+    //
+    // When inputs are exact (point intervals), interval arithmetic must
+    // produce exact results: from_point(x) op from_point(y) == from_point(x op y).
+
+    /// Point + Point = Point(sum).
+    pub proof fn lemma_point_add_exact(x: Rational, y: Rational)
+        ensures
+            Self::from_point_spec(x).add_spec(Self::from_point_spec(y))
+                == Self::from_point_spec(x.add_spec(y)),
+    {
+        // Definitional: lo = x + y, hi = x + y.
+    }
+
+    /// Point negation is exact.
+    pub proof fn lemma_point_neg_exact(x: Rational)
+        ensures
+            Self::from_point_spec(x).neg_spec()
+                == Self::from_point_spec(x.neg_spec()),
+    {
+        // neg swaps lo/hi, but they're equal so swap is identity.
+    }
+
+    /// Point - Point = Point(difference).
+    pub proof fn lemma_point_sub_exact(x: Rational, y: Rational)
+        ensures
+            Self::from_point_spec(x).sub_spec(Self::from_point_spec(y))
+                == Self::from_point_spec(x.sub_spec(y)),
+    {
+        // lo = x - y, hi = x - y.
+    }
+
+    /// Point reciprocal is exact.
+    pub proof fn lemma_point_recip_exact(x: Rational)
+        ensures
+            Self::from_point_spec(x).recip_spec()
+                == Self::from_point_spec(x.reciprocal_spec()),
+    {
+        // recip swaps lo/hi, but they're equal so swap is identity.
+    }
+
+    // ── Category 2: Algebraic involutions ────────────────────────
+
+    /// Double negation is identity.
+    pub proof fn lemma_neg_involution(a: Interval)
+        ensures
+            a.neg_spec().neg_spec() == a,
+    {
+        // neg: {lo: -hi, hi: -lo}. Double: {lo: -(-lo), hi: -(-hi)}.
+        Rational::lemma_neg_involution(a.lo);
+        Rational::lemma_neg_involution(a.hi);
+    }
+
+    // ── Category 4: Structural identities ────────────────────────
+
+    /// Interval addition is commutative (up to rational equivalence).
+    pub proof fn lemma_add_commutative(a: Interval, b: Interval)
+        ensures
+            a.add_spec(b).lo.eqv_spec(b.add_spec(a).lo),
+            a.add_spec(b).hi.eqv_spec(b.add_spec(a).hi),
+    {
+        Rational::lemma_add_commutative(a.lo, b.lo);
+        Rational::lemma_add_commutative(a.hi, b.hi);
+    }
+
+    /// Adding zero (as a point interval) is identity.
+    pub proof fn lemma_add_zero_identity(a: Interval)
+        ensures
+            a.add_spec(Self::from_point_spec(Rational::from_int_spec(0))) == a,
+    {
+        Rational::lemma_add_zero_identity(a.lo);
+        Rational::lemma_add_zero_identity(a.hi);
+    }
 }
 
 } // verus!
