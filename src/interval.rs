@@ -3351,20 +3351,37 @@ impl Interval {
         assert(target.denom() == da * dc);
 
         // Need: sum.num * target.denom() == target.num * sum.denom()
-        assert(sum.num * target.denom() == target.num * sum.denom()) by (nonlinear_arith)
+        // Stage 1: substitute negations to expose cancellation structure
+        assert(sum.num ==
+            (a.num * db - b.num * da) * (db * dc)
+            + (b.num * dc - c.num * db) * (da * db))
+            by (nonlinear_arith)
             requires
                 ab.num == a.num * db + nb.num * da,
-                ab.denom() == da * db,
                 bc.num == b.num * dc + nc.num * db,
-                bc.denom() == db * dc,
                 sum.num == ab.num * (db * dc) + bc.num * (da * db),
+                nb.num == -b.num,
+                nc.num == -c.num,
+        ;
+        // Stage 2: expand each product and cancel b-terms
+        assert((a.num * db - b.num * da) * (db * dc)
+            == a.num * db * db * dc - b.num * da * db * dc)
+            by (nonlinear_arith);
+        assert((b.num * dc - c.num * db) * (da * db)
+            == b.num * da * db * dc - c.num * da * db * db)
+            by (nonlinear_arith);
+        assert(a.num * db * db * dc - b.num * da * db * dc
+            + (b.num * da * db * dc - c.num * da * db * db)
+            == db * db * (a.num * dc - c.num * da))
+            by (nonlinear_arith);
+        // Stage 3: cross-multiply using factored form
+        assert(sum.num * target.denom() == target.num * sum.denom())
+            by (nonlinear_arith)
+            requires
+                sum.num == db * db * (a.num * dc - c.num * da),
                 sum.denom() == (da * db) * (db * dc),
                 target.num == a.num * dc + nc.num * da,
                 target.denom() == da * dc,
-                da > 0,
-                db > 0,
-                dc > 0,
-                nb.num == -b.num,
                 nc.num == -c.num,
         ;
     }
@@ -3701,6 +3718,200 @@ impl Interval {
     {
         Rational::lemma_add_zero_identity(a.lo);
         Rational::lemma_add_zero_identity(a.hi);
+    }
+
+    /// Point * Point = Point(product).
+    pub proof fn lemma_point_mul_exact(x: Rational, y: Rational)
+        ensures
+            Self::from_point_spec(x).mul_spec(Self::from_point_spec(y))
+                == Self::from_point_spec(x.mul_spec(y)),
+    {
+        // All four corner products are x*y; min4/max4 collapse since a.le_spec(a).
+    }
+
+    /// Point square is exact.
+    pub proof fn lemma_point_square_exact(x: Rational)
+        ensures
+            Self::from_point_spec(x).square_spec()
+                == Self::from_point_spec(x.mul_spec(x)),
+    {
+        // Case split on sign of x handled by SMT: either 0<=x.num or x.num<0.
+        // Both branches of square_spec produce {lo: x*x, hi: x*x}.
+    }
+
+    /// Point abs is exact.
+    pub proof fn lemma_point_abs_exact(x: Rational)
+        ensures
+            Self::from_point_spec(x).abs_spec()
+                == Self::from_point_spec(x.abs_spec()),
+    {
+        // Interval abs_spec branches on zero.le_spec(x) where
+        // zero = from_int_spec(0). Help Verus connect this to x.num >= 0
+        // used by Rational::abs_spec.
+        let zero = Rational::from_int_spec(0);
+        Rational::lemma_denom_positive(x);
+        assert(zero.le_spec(x) == (x.num >= 0)) by (nonlinear_arith)
+            requires
+                zero.num == 0int,
+                zero.denom() == 1int,
+                x.denom() > 0,
+        ;
+    }
+
+    /// Multiplying by one (as a point interval) is identity.
+    pub proof fn lemma_mul_one_identity(a: Interval)
+        requires
+            a.wf_spec(),
+        ensures
+            a.mul_spec(Self::from_point_spec(Rational::from_int_spec(1))) == a,
+    {
+        Rational::lemma_mul_one_identity(a.lo);
+        Rational::lemma_mul_one_identity(a.hi);
+        // Products collapse to {a.lo, a.lo, a.hi, a.hi}.
+        // min4 = a.lo and max4 = a.hi by wf (lo <= hi).
+    }
+
+    // ── Category 3: Self-interaction ─────────────────────────────
+
+    /// a - a contains zero.
+    pub proof fn lemma_self_sub_contains_zero(a: Interval)
+        requires
+            a.wf_spec(),
+        ensures
+            a.sub_spec(a).contains_spec(Rational::from_int_spec(0)),
+    {
+        let zero = Rational::from_int_spec(0);
+        // a.sub_spec(a) = [a.lo - a.hi, a.hi - a.lo]
+        // Since a.lo <= a.hi (wf):
+        //   a.lo - a.hi <= a.hi - a.hi ≡ 0   (lower bound)
+        //   0 ≡ a.hi - a.hi <= a.hi - a.lo    (upper bound)
+
+        Rational::lemma_sub_self(a.hi);
+        Rational::lemma_eqv_implies_le(a.hi.sub_spec(a.hi), zero);
+
+        // Lower bound: a.lo - a.hi <= 0
+        Rational::lemma_sub_le_monotone_left(a.lo, a.hi, a.hi);
+        Rational::lemma_le_transitive(
+            a.lo.sub_spec(a.hi), a.hi.sub_spec(a.hi), zero);
+
+        // Upper bound: 0 <= a.hi - a.lo
+        Rational::lemma_sub_le_monotone_right(a.lo, a.hi, a.hi);
+        Rational::lemma_le_transitive(
+            zero, a.hi.sub_spec(a.hi), a.hi.sub_spec(a.lo));
+    }
+
+    /// a / a contains one (when 0 ∉ a).
+    pub proof fn lemma_self_div_contains_one(a: Interval)
+        requires
+            a.wf_spec(),
+            Rational::from_int_spec(0).lt_spec(a.lo)
+                || a.hi.lt_spec(Rational::from_int_spec(0)),
+        ensures
+            a.div_spec(a).contains_spec(Rational::from_int_spec(1)),
+    {
+        let zero = Rational::from_int_spec(0);
+        let one = Rational::from_int_spec(1);
+
+        // a.lo ∈ a
+        Self::lemma_contains_lo(a);
+
+        // a.lo / a.lo ∈ a / a
+        Self::lemma_div_containment(a, a, a.lo, a.lo);
+
+        // Establish !a.lo.eqv_spec(0) so we can use div_self
+        if zero.lt_spec(a.lo) {
+            Rational::lemma_trichotomy(zero, a.lo);
+            Rational::lemma_eqv_symmetric(zero, a.lo);
+        } else {
+            Rational::lemma_le_lt_transitive(a.lo, a.hi, zero);
+            Rational::lemma_trichotomy(a.lo, zero);
+        }
+
+        // a.lo / a.lo ≡ 1
+        Rational::lemma_div_self(a.lo);
+        let q = a.lo.div_spec(a.lo);
+        Rational::lemma_eqv_implies_le(q, one);
+
+        // Chain: result.lo <= q <= 1 and 1 <= q <= result.hi
+        let result = a.div_spec(a);
+        Rational::lemma_le_transitive(result.lo, q, one);
+        Rational::lemma_le_transitive(one, q, result.hi);
+    }
+
+    // ── Category 4 (continued): Structural identities ────────────
+
+    /// Interval multiplication is commutative (up to rational equivalence).
+    pub proof fn lemma_mul_commutative(a: Interval, b: Interval)
+        ensures
+            a.mul_spec(b).lo.eqv_spec(b.mul_spec(a).lo),
+            a.mul_spec(b).hi.eqv_spec(b.mul_spec(a).hi),
+    {
+        // After mul_commutative, b*a uses the same four products
+        // as a*b, just in a different min4/max4 order.
+        Rational::lemma_mul_commutative(a.lo, b.lo);
+        Rational::lemma_mul_commutative(a.lo, b.hi);
+        Rational::lemma_mul_commutative(a.hi, b.lo);
+        Rational::lemma_mul_commutative(a.hi, b.hi);
+
+        let ac = a.lo.mul_spec(b.lo);
+        let ad = a.lo.mul_spec(b.hi);
+        let bc = a.hi.mul_spec(b.lo);
+        let bd = a.hi.mul_spec(b.hi);
+
+        // a*b.lo = min4(ac,ad,bc,bd), b*a.lo = min4(ac,bc,ad,bd).
+        // Both ≤ the other by lemma_min4_le (each min4 result is
+        // one of the four products, so it witnesses the disjunction).
+        let min_ab = ac.min_spec(ad).min_spec(bc).min_spec(bd);
+        let min_ba = ac.min_spec(bc).min_spec(ad).min_spec(bd);
+        Self::lemma_min4_le(ac, ad, bc, bd, min_ba);
+        Self::lemma_min4_le(ac, bc, ad, bd, min_ab);
+        Rational::lemma_le_antisymmetric(min_ab, min_ba);
+
+        // Same for max (hi).
+        let max_ab = ac.max_spec(ad).max_spec(bc).max_spec(bd);
+        let max_ba = ac.max_spec(bc).max_spec(ad).max_spec(bd);
+        Self::lemma_max4_ge(ac, ad, bc, bd, max_ba);
+        Self::lemma_max4_ge(ac, bc, ad, bd, max_ab);
+        Rational::lemma_le_antisymmetric(max_ab, max_ba);
+    }
+
+    // ── Category 5: Tightness ────────────────────────────────────
+
+    /// square_spec is at least as tight as mul_spec(self, self).
+    pub proof fn lemma_square_tighter_than_mul(a: Interval)
+        requires
+            a.wf_spec(),
+        ensures
+            a.mul_spec(a).contains_interval_spec(a.square_spec()),
+    {
+        let zero = Rational::from_int_spec(0);
+        let lo2 = a.lo.mul_spec(a.lo);
+        let lh  = a.lo.mul_spec(a.hi);
+        let hl  = a.hi.mul_spec(a.lo);
+        let hi2 = a.hi.mul_spec(a.hi);
+
+        if zero.le_spec(a.lo) {
+            // Nonneg: square = [lo², hi²], both are corner products.
+            Self::lemma_min4_le(lo2, lh, hl, hi2, lo2);
+            Self::lemma_max4_ge(lo2, lh, hl, hi2, hi2);
+        } else if a.hi.le_spec(zero) {
+            // Nonpos: square = [hi², lo²], both are corner products.
+            Self::lemma_min4_le(lo2, lh, hl, hi2, hi2);
+            Self::lemma_max4_ge(lo2, lh, hl, hi2, lo2);
+        } else {
+            // Spans zero: square = [0, max(lo², hi²)].
+            // lo bound: lh = a.lo*a.hi ≤ 0 since a.lo < 0 < a.hi.
+            Rational::lemma_le_mul_nonneg(a.lo, zero, a.hi);
+            Rational::lemma_mul_zero(a.hi);
+            Rational::lemma_eqv_implies_le(
+                zero.mul_spec(a.hi), zero);
+            Rational::lemma_le_transitive(lh, zero.mul_spec(a.hi), zero);
+            Self::lemma_min4_le(lo2, lh, hl, hi2, zero);
+
+            // hi bound: max(lo², hi²) is one of {lo², hi²},
+            // both of which are corner products.
+            Self::lemma_max4_ge(lo2, lh, hl, hi2, a.square_spec().hi);
+        }
     }
 }
 
