@@ -71,9 +71,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
 
 [[package]]
+name = "verus-algebra"
+version = "0.1.0"
+dependencies = [
+ "vstd",
+]
+
+[[package]]
 name = "verus-bigint"
 version = "0.1.0"
 dependencies = [
+ "verus-algebra",
  "vstd",
 ]
 
@@ -81,6 +89,7 @@ dependencies = [
 name = "verus-interval-arithmetic"
 version = "0.1.0"
 dependencies = [
+ "verus-algebra",
  "verus-bigint",
  "verus-rational",
  "vstd",
@@ -90,6 +99,7 @@ dependencies = [
 name = "verus-rational"
 version = "0.1.0"
 dependencies = [
+ "verus-algebra",
  "verus-bigint",
  "vstd",
 ]
