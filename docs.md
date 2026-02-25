@@ -24,7 +24,7 @@
   > Compute derivative polynomial coefficients. If p(x) = c₀ + c₁x + c₂x² + ..., then p'(x) = c₁ + 2c₂x + 3c₃x² + ... Output: [c₁, 2*c₂, 3*c₃, ...]
 - **`open spec fn hausdorff_spec`** — [interval.rs:3034](./src/interval.rs#L3034)
   > Hausdorff distance between two intervals. max(|lo₁ - lo₂|, |hi₁ - hi₂|)
-- **`open spec fn gap_spec`** — [interval.rs:3376](./src/interval.rs#L3376)
+- **`open spec fn gap_spec`** — [interval.rs:3344](./src/interval.rs#L3344)
   > Gap (separation) between two intervals. Positive iff the intervals are disjoint.
 
 ### Proof Functions
@@ -129,22 +129,68 @@
   > Hausdorff distance is zero iff intervals are componentwise equivalent.
 - **`proof fn lemma_hausdorff_triangle`** — [interval.rs:3117](./src/interval.rs#L3117)
   > Hausdorff triangle inequality: hausdorff(a, c) ≤ hausdorff(a, b) + hausdorff(b, c).
-- **`proof fn lemma_gap_positive_iff_disjoint`** — [interval.rs:3384](./src/interval.rs#L3384)
+- **`proof fn lemma_gap_positive_iff_disjoint`** — [interval.rs:3352](./src/interval.rs#L3352)
   > Gap is positive iff intervals are disjoint.
-- **`proof fn lemma_gap_bounds_element_distance`** — [interval.rs:3451](./src/interval.rs#L3451)
+- **`proof fn lemma_gap_bounds_element_distance`** — [interval.rs:3419](./src/interval.rs#L3419)
   > Gap bounds element distance: x ∈ a ∧ y ∈ b → |x - y| ≥ gap(a, b).
-- **`proof fn lemma_point_add_exact`** — [interval.rs:3638](./src/interval.rs#L3638)
+- **`proof fn lemma_point_add_exact`** — [interval.rs:3606](./src/interval.rs#L3606)
   > Point + Point = Point(sum).
-- **`proof fn lemma_point_neg_exact`** — [interval.rs:3647](./src/interval.rs#L3647)
+- **`proof fn lemma_point_neg_exact`** — [interval.rs:3615](./src/interval.rs#L3615)
   > Point negation is exact.
-- **`proof fn lemma_point_sub_exact`** — [interval.rs:3656](./src/interval.rs#L3656)
+- **`proof fn lemma_point_sub_exact`** — [interval.rs:3624](./src/interval.rs#L3624)
   > Point - Point = Point(difference).
-- **`proof fn lemma_point_recip_exact`** — [interval.rs:3665](./src/interval.rs#L3665)
+- **`proof fn lemma_point_recip_exact`** — [interval.rs:3633](./src/interval.rs#L3633)
   > Point reciprocal is exact.
-- **`proof fn lemma_neg_involution`** — [interval.rs:3676](./src/interval.rs#L3676)
+- **`proof fn lemma_neg_involution`** — [interval.rs:3644](./src/interval.rs#L3644)
   > Double negation is identity.
-- **`proof fn lemma_add_commutative`** — [interval.rs:3688](./src/interval.rs#L3688)
+- **`proof fn lemma_add_commutative`** — [interval.rs:3656](./src/interval.rs#L3656)
   > Interval addition is commutative (up to rational equivalence).
+- **`proof fn lemma_add_zero_identity`** — [interval.rs:3666](./src/interval.rs#L3666)
+  > Adding zero (as a point interval) is identity.
+- **`proof fn lemma_point_mul_exact`** — [interval.rs:3675](./src/interval.rs#L3675)
+  > Point * Point = Point(product).
+- **`proof fn lemma_point_square_exact`** — [interval.rs:3684](./src/interval.rs#L3684)
+  > Point square is exact.
+- **`proof fn lemma_point_abs_exact`** — [interval.rs:3694](./src/interval.rs#L3694)
+  > Point abs is exact.
+- **`proof fn lemma_mul_one_identity`** — [interval.rs:3713](./src/interval.rs#L3713)
+  > Multiplying by one (as a point interval) is identity.
+- **`proof fn lemma_self_sub_contains_zero`** — [interval.rs:3728](./src/interval.rs#L3728)
+  > a - a contains zero.
+- **`proof fn lemma_self_div_contains_one`** — [interval.rs:3755](./src/interval.rs#L3755)
+  > a / a contains one (when 0 ∉ a).
+- **`proof fn lemma_mul_commutative`** — [interval.rs:3795](./src/interval.rs#L3795)
+  > Interval multiplication is commutative (up to rational equivalence).
+- **`proof fn lemma_square_tighter_than_mul`** — [interval.rs:3832](./src/interval.rs#L3832)
+  > square_spec is at least as tight as mul_spec(self, self).
+- **`proof fn lemma_sign_definite_soundness`** — [interval.rs:3871](./src/interval.rs#L3871)
+  > sign_definite agrees with the certainly_* predicates.
+- **`proof fn lemma_certainly_lt_transitive`** — [interval.rs:3884](./src/interval.rs#L3884)
+  > certainly_lt is transitive.
+- **`proof fn lemma_certainly_lt_asymmetric`** — [interval.rs:3898](./src/interval.rs#L3898)
+  > certainly_lt is asymmetric.
+- **`proof fn lemma_add_associative`** — [interval.rs:3916](./src/interval.rs#L3916)
+  > Interval addition is associative (up to rational equivalence).
+- **`proof fn lemma_scale_zero`** — [interval.rs:3930](./src/interval.rs#L3930)
+  > Scaling by zero produces endpoints equivalent to zero.
+- **`proof fn lemma_scale_one_identity`** — [interval.rs:3945](./src/interval.rs#L3945)
+  > Scaling by one is identity.
+- **`proof fn lemma_sub_monotone`** — [interval.rs:3960](./src/interval.rs#L3960)
+  > Subtraction is containment-monotonic.
+- **`proof fn lemma_scale_neg_one_eq_neg`** — [interval.rs:3975](./src/interval.rs#L3975)
+  > Scaling by -1 is negation (up to rational equivalence).
+- **`proof fn lemma_mul_zero_annihilates`** — [interval.rs:4018](./src/interval.rs#L4018)
+  > Multiplying by the zero interval yields zero endpoints.
+- **`proof fn lemma_hausdorff_symmetric`** — [interval.rs:4038](./src/interval.rs#L4038)
+  > Hausdorff distance is symmetric.
+- **`proof fn lemma_hausdorff_nonneg`** — [interval.rs:4055](./src/interval.rs#L4055)
+  > Hausdorff distance is nonneg.
+- **`proof fn lemma_abs_idempotent`** — [interval.rs:4073](./src/interval.rs#L4073)
+  > Absolute value is idempotent.
+- **`proof fn lemma_scale_monotone`** — [interval.rs:4097](./src/interval.rs#L4097)
+  > Scale is containment-monotonic.
+- **`proof fn lemma_scale_eq_point_mul`** — [interval.rs:4135](./src/interval.rs#L4135)
+  > scale(k, a) agrees with from_point(k) * a (up to eqv on endpoints).
 
 ## `interval::Interval`
 
