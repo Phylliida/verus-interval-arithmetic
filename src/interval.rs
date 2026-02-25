@@ -3864,6 +3864,418 @@ impl Interval {
             Self::lemma_max4_ge(lo2, lh, hl, hi2, a.square_spec().hi);
         }
     }
+
+    // ── Category 6: Sign/comparison soundness ────────────────────
+
+    /// sign_definite agrees with the certainly_* predicates.
+    pub proof fn lemma_sign_definite_soundness(a: Interval)
+        requires
+            a.wf_spec(),
+        ensures
+            a.sign_definite_spec() == Option::Some(1i8) ==> a.certainly_positive_spec(),
+            a.sign_definite_spec() == Option::Some(-1i8) ==> a.certainly_negative_spec(),
+            a.sign_definite_spec() == Option::Some(0i8) ==> a.certainly_zero_spec(),
+    {
+        // Definitional: sign_definite_spec is an if-else chain over the
+        // certainly_* predicates, so each implication holds by construction.
+    }
+
+    /// certainly_lt is transitive.
+    pub proof fn lemma_certainly_lt_transitive(a: Interval, b: Interval, c: Interval)
+        requires
+            a.certainly_lt_spec(b),
+            b.certainly_lt_spec(c),
+            b.wf_spec(),
+        ensures
+            a.certainly_lt_spec(c),
+    {
+        // a.hi < b.lo <= b.hi < c.lo
+        Rational::lemma_lt_le_transitive(a.hi, b.lo, b.hi);
+        Rational::lemma_lt_transitive(a.hi, b.hi, c.lo);
+    }
+
+    /// certainly_lt is asymmetric.
+    pub proof fn lemma_certainly_lt_asymmetric(a: Interval, b: Interval)
+        requires
+            a.wf_spec(),
+            b.wf_spec(),
+            a.certainly_lt_spec(b),
+        ensures
+            !b.certainly_lt_spec(a),
+    {
+        // a.hi < b.lo <= b.hi (b wf), and a.lo <= a.hi (a wf).
+        // So a.lo <= a.hi < b.lo <= b.hi, hence ¬(b.hi < a.lo).
+        Rational::lemma_lt_le_transitive(a.hi, b.lo, b.hi);
+        Rational::lemma_le_lt_transitive(a.lo, a.hi, b.hi);
+        Rational::lemma_lt_irreflexive(b.hi);
+    }
+
+    // ── Category 7: Interval algebra ─────────────────────────────
+
+    /// Interval addition is associative (up to rational equivalence).
+    pub proof fn lemma_add_associative(a: Interval, b: Interval, c: Interval)
+        ensures
+            a.add_spec(b).add_spec(c).lo.eqv_spec(
+                a.add_spec(b.add_spec(c)).lo),
+            a.add_spec(b).add_spec(c).hi.eqv_spec(
+                a.add_spec(b.add_spec(c)).hi),
+    {
+        Rational::lemma_add_associative(a.lo, b.lo, c.lo);
+        Rational::lemma_add_associative(a.hi, b.hi, c.hi);
+    }
+
+    // ── Category 8: Scale identities ─────────────────────────────
+
+    /// Scaling by zero produces endpoints equivalent to zero.
+    pub proof fn lemma_scale_zero(a: Interval)
+        ensures
+            Self::scale_spec(Rational::from_int_spec(0), a).lo.eqv_spec(
+                Rational::from_int_spec(0)),
+            Self::scale_spec(Rational::from_int_spec(0), a).hi.eqv_spec(
+                Rational::from_int_spec(0)),
+    {
+        let zero = Rational::from_int_spec(0);
+        Rational::lemma_mul_zero(a.lo);
+        Rational::lemma_mul_zero(a.hi);
+        // Both 0*lo ≡ 0 and 0*hi ≡ 0. min_spec returns one of them
+        // (since both have num=0, le_spec is trivially true), so result ≡ 0.
+    }
+
+    /// Scaling by one is identity.
+    pub proof fn lemma_scale_one_identity(a: Interval)
+        requires
+            a.wf_spec(),
+        ensures
+            Self::scale_spec(Rational::from_int_spec(1), a) == a,
+    {
+        let one = Rational::from_int_spec(1);
+        Rational::lemma_mul_one_identity(a.lo);
+        Rational::lemma_mul_one_identity(a.hi);
+        // 1*lo == lo, 1*hi == hi (structural). min(lo,hi) == lo, max(lo,hi) == hi by wf.
+    }
+
+    // ── Category 9: Monotonicity ─────────────────────────────────
+
+    /// Subtraction is containment-monotonic.
+    pub proof fn lemma_sub_monotone(a: Interval, a2: Interval, b: Interval, b2: Interval)
+        requires
+            a2.contains_interval_spec(a),
+            b2.contains_interval_spec(b),
+        ensures
+            a2.sub_spec(b2).contains_interval_spec(a.sub_spec(b)),
+    {
+        // sub_spec(x,y) == add_spec(x, neg_spec(y)) structurally at Rational level.
+        Self::lemma_neg_monotone(b, b2);
+        Self::lemma_add_monotone(a, a2, b.neg_spec(), b2.neg_spec());
+    }
+
+    // ── Category 8 (continued): Scale identities ─────────────────
+
+    /// Scaling by -1 is negation (up to rational equivalence).
+    pub proof fn lemma_scale_neg_one_eq_neg(a: Interval)
+        requires
+            a.wf_spec(),
+        ensures
+            Self::scale_spec(Rational::from_int_spec(-1), a).lo.eqv_spec(
+                a.neg_spec().lo),
+            Self::scale_spec(Rational::from_int_spec(-1), a).hi.eqv_spec(
+                a.neg_spec().hi),
+    {
+        let neg1 = Rational::from_int_spec(-1);
+        let one = Rational::from_int_spec(1);
+        let nlo = a.lo.neg_spec();
+        let nhi = a.hi.neg_spec();
+
+        // neg1 * x == -x structurally.
+        Rational::lemma_from_int_neg(1int);
+        Rational::lemma_mul_commutative(neg1, a.lo);
+        Rational::lemma_mul_commutative(neg1, a.hi);
+        Rational::lemma_mul_neg_right(a.lo, one);
+        Rational::lemma_mul_neg_right(a.hi, one);
+        Rational::lemma_mul_one_identity(a.lo);
+        Rational::lemma_mul_one_identity(a.hi);
+        assert(neg1.mul_spec(a.lo) == nlo);
+        assert(neg1.mul_spec(a.hi) == nhi);
+
+        // scale = [min(nlo, nhi), max(nlo, nhi)], neg = [nhi, nlo].
+        // Since wf: a.lo <= a.hi, so nhi <= nlo.
+        Rational::lemma_neg_reverses_le(a.lo, a.hi);
+
+        if nlo.le_spec(nhi) {
+            // Both le_specs hold → nlo eqv nhi.
+            Rational::lemma_le_antisymmetric(nlo, nhi);
+            // min(nlo, nhi) == nlo (le true), eqv to nhi ✓
+            // max(nlo, nhi) == nhi (le true), eqv to nlo ✓
+        } else {
+            // nhi < nlo strictly. min(nlo, nhi) == nhi, max(nlo, nhi) == nlo.
+            // Structurally equal to neg's endpoints.
+        }
+    }
+
+    // ── Category 2 (continued): Mul edge cases ──────────────────
+
+    /// Multiplying by the zero interval yields zero endpoints.
+    pub proof fn lemma_mul_zero_annihilates(a: Interval)
+        requires
+            a.wf_spec(),
+        ensures
+            a.mul_spec(Self::from_point_spec(Rational::from_int_spec(0))).lo.eqv_spec(
+                Rational::from_int_spec(0)),
+            a.mul_spec(Self::from_point_spec(Rational::from_int_spec(0))).hi.eqv_spec(
+                Rational::from_int_spec(0)),
+    {
+        let zero = Rational::from_int_spec(0);
+        // All four corner products: a.lo*0, a.lo*0, a.hi*0, a.hi*0.
+        Rational::lemma_mul_zero(a.lo);
+        Rational::lemma_mul_zero(a.hi);
+        // Each product has num == 0, so all are eqv to zero.
+        // min4/max4 returns one of them, which is eqv to zero.
+    }
+
+    // ── Category 10: Metric properties ───────────────────────────
+
+    /// Hausdorff distance is symmetric.
+    pub proof fn lemma_hausdorff_symmetric(a: Interval, b: Interval)
+        requires
+            a.wf_spec(),
+            b.wf_spec(),
+        ensures
+            a.hausdorff_spec(b) == b.hausdorff_spec(a),
+    {
+        // |a.lo - b.lo| == |b.lo - a.lo| and |a.hi - b.hi| == |b.hi - a.hi|
+        // structurally, because (x-y) and (y-x) have negated numerators
+        // and same denom, so abs produces identical structs.
+        Rational::lemma_neg_sub(a.lo, b.lo);
+        Rational::lemma_neg_sub(a.hi, b.hi);
+        Rational::lemma_abs_neg(a.lo.sub_spec(b.lo));
+        Rational::lemma_abs_neg(a.hi.sub_spec(b.hi));
+    }
+
+    /// Hausdorff distance is nonneg.
+    pub proof fn lemma_hausdorff_nonneg(a: Interval, b: Interval)
+        requires
+            a.wf_spec(),
+            b.wf_spec(),
+        ensures
+            Rational::from_int_spec(0).le_spec(a.hausdorff_spec(b)),
+    {
+        let zero = Rational::from_int_spec(0);
+        let d_lo = a.lo.sub_spec(b.lo).abs_spec();
+        let d_hi = a.hi.sub_spec(b.hi).abs_spec();
+        // 0 <= |lo diff| <= max(|lo diff|, |hi diff|) = hausdorff.
+        Rational::lemma_max_ge_left(d_lo, d_hi);
+        // 0 <= d_lo: abs produces nonneg num, and le_spec(0, x) iff x.num >= 0.
+    }
+
+    // ── Category 4 (continued): Involutions/Idempotence ──────────
+
+    /// Absolute value is idempotent.
+    pub proof fn lemma_abs_idempotent(a: Interval)
+        requires
+            a.wf_spec(),
+        ensures
+            a.abs_spec().abs_spec() == a.abs_spec(),
+    {
+        // After abs, result.lo >= 0 in all branches, so second abs
+        // takes the "entirely nonneg" branch (identity).
+        let zero = Rational::from_int_spec(0);
+        let b = a.abs_spec();
+        if zero.le_spec(a.lo) {
+            // b == a, 0 <= a.lo = b.lo, so abs(b) = b.
+        } else if a.hi.le_spec(zero) {
+            // b = neg(a) = [-a.hi, -a.lo]. b.lo = -a.hi.
+            // a.hi <= 0 ⟹ -a.hi >= 0, i.e., 0 <= b.lo.
+            Rational::lemma_denom_positive(a.hi);
+        } else {
+            // b = [0, max(-a.lo, a.hi)]. b.lo = 0. 0 <= 0.
+        }
+    }
+
+    // ── Category 9 (continued): Monotonicity ─────────────────────
+
+    /// Scale is containment-monotonic.
+    pub proof fn lemma_scale_monotone(scalar: Rational, a: Interval, a2: Interval)
+        requires
+            a.wf_spec(),
+            a2.wf_spec(),
+            a2.contains_interval_spec(a),
+        ensures
+            Self::scale_spec(scalar, a2).contains_interval_spec(
+                Self::scale_spec(scalar, a)),
+    {
+        let k = scalar;
+        // a.lo ∈ a (since wf) and a ⊆ a', so a.lo ∈ a'.
+        Self::lemma_contains_lo(a);
+        Self::lemma_contains_hi(a);
+        Self::lemma_contains_transitive(a, a2, a.lo);
+        Self::lemma_contains_transitive(a, a2, a.hi);
+
+        // k * a.lo ∈ scale(k, a') and k * a.hi ∈ scale(k, a').
+        Self::lemma_scale_containment(k, a2, a.lo);
+        Self::lemma_scale_containment(k, a2, a.hi);
+
+        // scale(k, a) = [min(k*a.lo, k*a.hi), max(k*a.lo, k*a.hi)].
+        // Since both k*a.lo and k*a.hi are in scale(k, a'),
+        // scale(k, a').lo <= k*a.lo and scale(k, a').lo <= k*a.hi,
+        // so scale(k, a').lo <= min(k*a.lo, k*a.hi) = scale(k, a).lo.
+        let ka_lo = k.mul_spec(a.lo);
+        let ka_hi = k.mul_spec(a.hi);
+        let s_a2 = Self::scale_spec(k, a2);
+
+        if ka_lo.le_spec(ka_hi) {
+            // min = ka_lo, max = ka_hi. s_a2 contains ka_lo and ka_hi.
+        } else {
+            // min = ka_hi, max = ka_lo. s_a2 contains both.
+        }
+    }
+
+    // ── Category 3: Cross-operation consistency ──────────────────
+
+    /// scale(k, a) agrees with from_point(k) * a (up to eqv on endpoints).
+    pub proof fn lemma_scale_eq_point_mul(k: Rational, a: Interval)
+        requires
+            a.wf_spec(),
+        ensures
+            Self::scale_spec(k, a).lo.eqv_spec(
+                Self::from_point_spec(k).mul_spec(a).lo),
+            Self::scale_spec(k, a).hi.eqv_spec(
+                Self::from_point_spec(k).mul_spec(a).hi),
+    {
+        // from_point(k) = [k, k]. Products are k*a.lo, k*a.hi, k*a.lo, k*a.hi.
+        // min4(x, y, x, y) ≡ min(x, y) and max4(x, y, x, y) ≡ max(x, y).
+        let x = k.mul_spec(a.lo);
+        let y = k.mul_spec(a.hi);
+        // mul_spec([k,k], a).lo = min4(k*a.lo, k*a.hi, k*a.lo, k*a.hi)
+        //                       = min(min(min(x, y), x), y)
+        // scale_spec(k, a).lo   = min(x, y)
+        // Need: min(min(min(x, y), x), y) eqv min(x, y).
+        // min(x, y) <= x (min_le_left), so min(min(x,y), x) == min(x,y).
+        // min(x, y) <= y (min_le_right), so min(min(x,y), y) == min(x,y).
+        // Similarly for max.
+        Rational::lemma_min_le_left(x, y);
+        Rational::lemma_min_le_right(x, y);
+        Rational::lemma_max_ge_left(x, y);
+        Rational::lemma_max_ge_right(x, y);
+        // After min(x,y) <= x, min(min(x,y), x) == min(x,y) by le_spec.
+        // After min(min(x,y), x) <= y via min_le_right then le_transitive:
+        let mxy = x.min_spec(y);
+        Rational::lemma_min_le_right(mxy, x);
+        Rational::lemma_le_transitive(mxy.min_spec(x), mxy, y);
+        // The min4 chain collapses. Similarly for max4.
+        Rational::lemma_max_ge_left(x.max_spec(y), x);
+        Rational::lemma_le_transitive(y, x.max_spec(y), x.max_spec(y).max_spec(x));
+        // Final eqv: both sides produce eqv endpoints.
+        Rational::lemma_le_antisymmetric(
+            mxy.min_spec(x).min_spec(y), mxy);
+        Rational::lemma_le_antisymmetric(
+            x.max_spec(y),
+            x.max_spec(y).max_spec(x).max_spec(y));
+    }
+
+    // ── Category 11: Subdistributivity ───────────────────────────
+
+    /// a*(b+c) ⊆ a*b + a*c (fundamental interval arithmetic property).
+    pub proof fn lemma_subdistributive(a: Interval, b: Interval, c: Interval)
+        requires
+            a.wf_spec(),
+            b.wf_spec(),
+            c.wf_spec(),
+        ensures
+            a.mul_spec(b).add_spec(a.mul_spec(c)).contains_interval_spec(
+                a.mul_spec(b.add_spec(c))),
+    {
+        let bc = b.add_spec(c);
+        let ab = a.mul_spec(b);
+        let ac = a.mul_spec(c);
+        let rhs = ab.add_spec(ac); // a*b + a*c (outer)
+        let lhs = a.mul_spec(bc);  // a*(b+c) (inner)
+
+        Self::lemma_add_wf(b, c);
+        Self::lemma_mul_wf(a, b);
+        Self::lemma_mul_wf(a, c);
+        Self::lemma_add_wf(ab, ac);
+
+        Self::lemma_contains_lo(a);
+        Self::lemma_contains_hi(a);
+        Self::lemma_contains_lo(b);
+        Self::lemma_contains_hi(b);
+        Self::lemma_contains_lo(c);
+        Self::lemma_contains_hi(c);
+
+        // Each corner Ci of a*(b+c) is a.endpoint * (b+c).endpoint.
+        // By distributivity, Ci ≡ sum_i ∈ a*b + a*c.
+        // So rhs.lo <= Ci <= rhs.hi for each corner.
+        let c1 = a.lo.mul_spec(bc.lo);
+        let c2 = a.lo.mul_spec(bc.hi);
+        let c3 = a.hi.mul_spec(bc.lo);
+        let c4 = a.hi.mul_spec(bc.hi);
+
+        // Corner 1: a.lo*(b.lo+c.lo) ≡ a.lo*b.lo + a.lo*c.lo ∈ rhs
+        Rational::lemma_eqv_mul_distributive_left(a.lo, b.lo, c.lo);
+        Self::lemma_mul_containment(a, b, a.lo, b.lo);
+        Self::lemma_mul_containment(a, c, a.lo, c.lo);
+        Self::lemma_add_containment(ab, ac,
+            a.lo.mul_spec(b.lo), a.lo.mul_spec(c.lo));
+        let s1 = a.lo.mul_spec(b.lo).add_spec(a.lo.mul_spec(c.lo));
+        Rational::lemma_eqv_implies_le(c1, s1);
+        Rational::lemma_le_transitive(rhs.lo, s1, c1);
+        Rational::lemma_le_transitive(c1, s1, rhs.hi);
+
+        // Corner 2: a.lo*(b.hi+c.hi)
+        Rational::lemma_eqv_mul_distributive_left(a.lo, b.hi, c.hi);
+        Self::lemma_mul_containment(a, b, a.lo, b.hi);
+        Self::lemma_mul_containment(a, c, a.lo, c.hi);
+        Self::lemma_add_containment(ab, ac,
+            a.lo.mul_spec(b.hi), a.lo.mul_spec(c.hi));
+        let s2 = a.lo.mul_spec(b.hi).add_spec(a.lo.mul_spec(c.hi));
+        Rational::lemma_eqv_implies_le(c2, s2);
+        Rational::lemma_le_transitive(rhs.lo, s2, c2);
+        Rational::lemma_le_transitive(c2, s2, rhs.hi);
+
+        // Corner 3: a.hi*(b.lo+c.lo)
+        Rational::lemma_eqv_mul_distributive_left(a.hi, b.lo, c.lo);
+        Self::lemma_mul_containment(a, b, a.hi, b.lo);
+        Self::lemma_mul_containment(a, c, a.hi, c.lo);
+        Self::lemma_add_containment(ab, ac,
+            a.hi.mul_spec(b.lo), a.hi.mul_spec(c.lo));
+        let s3 = a.hi.mul_spec(b.lo).add_spec(a.hi.mul_spec(c.lo));
+        Rational::lemma_eqv_implies_le(c3, s3);
+        Rational::lemma_le_transitive(rhs.lo, s3, c3);
+        Rational::lemma_le_transitive(c3, s3, rhs.hi);
+
+        // Corner 4: a.hi*(b.hi+c.hi)
+        Rational::lemma_eqv_mul_distributive_left(a.hi, b.hi, c.hi);
+        Self::lemma_mul_containment(a, b, a.hi, b.hi);
+        Self::lemma_mul_containment(a, c, a.hi, c.hi);
+        Self::lemma_add_containment(ab, ac,
+            a.hi.mul_spec(b.hi), a.hi.mul_spec(c.hi));
+        let s4 = a.hi.mul_spec(b.hi).add_spec(a.hi.mul_spec(c.hi));
+        Rational::lemma_eqv_implies_le(c4, s4);
+        Rational::lemma_le_transitive(rhs.lo, s4, c4);
+        Rational::lemma_le_transitive(c4, s4, rhs.hi);
+
+        // Now: rhs.lo <= Ci <= rhs.hi for each i.
+        // lhs.lo = min4(c1,c2,c3,c4), lhs.hi = max4(c1,c2,c3,c4).
+        // Need: rhs.lo <= lhs.lo and lhs.hi <= rhs.hi.
+        // min4 is one of {ci}, each >= rhs.lo. Case-split through min chain.
+        let m12 = c1.min_spec(c2);
+        if c1.le_spec(c2) { } else { }
+        // Now SMT knows rhs.lo <= m12 (since m12 is c1 or c2).
+        let m123 = m12.min_spec(c3);
+        if m12.le_spec(c3) { } else { }
+        let m1234 = m123.min_spec(c4);
+        if m123.le_spec(c4) { } else { }
+        // rhs.lo <= m1234 = lhs.lo ✓
+
+        // max4 is one of {ci}, each <= rhs.hi.
+        let x12 = c1.max_spec(c2);
+        if c1.le_spec(c2) { } else { }
+        let x123 = x12.max_spec(c3);
+        if x12.le_spec(c3) { } else { }
+        let x1234 = x123.max_spec(c4);
+        if x123.le_spec(c4) { } else { }
+        // lhs.hi = x1234 <= rhs.hi ✓
+    }
 }
 
 } // verus!
