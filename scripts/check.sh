@@ -4,7 +4,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERUS_ROOT="${VERUS_ROOT:-$ROOT_DIR/../verus}"
 VERUS_SOURCE="$VERUS_ROOT/source"
-TOOLCHAIN="${VERUS_TOOLCHAIN:-1.93.0-x86_64-unknown-linux-gnu}"
+if [[ -z "${VERUS_TOOLCHAIN:-}" ]]; then
+  case "$(uname -s)-$(uname -m)" in
+    Darwin-arm64)  TOOLCHAIN="1.93.0-aarch64-apple-darwin" ;;
+    Darwin-x86_64) TOOLCHAIN="1.93.0-x86_64-apple-darwin" ;;
+    *)             TOOLCHAIN="1.93.0-x86_64-unknown-linux-gnu" ;;
+  esac
+else
+  TOOLCHAIN="$VERUS_TOOLCHAIN"
+fi
 
 usage() {
   cat <<'USAGE'
@@ -118,7 +126,7 @@ check_no_trusted_escapes_in_non_test_sources() {
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
     local hits
-    hits="$(rg -n "$escape_pattern" "$file" 2>/dev/null || true)"
+    hits="$(grep -nE "$escape_pattern" "$file" 2>/dev/null || true)"
     if [[ -n "$hits" ]]; then
       violations+="$file:
 $hits
@@ -183,7 +191,7 @@ extract_verus_verified_count() {
   local verified_count=""
   local error_count=""
 
-  summary="$(rg -No 'verification results::\s*([0-9]+) verified,\s*([0-9]+) errors' -r '$1|$2' "$log_file" | tail -n 1 || true)"
+  summary="$(sed -nE 's/.*verification results::[[:space:]]*([0-9]+) verified,[[:space:]]*([0-9]+) errors.*/\1|\2/p' "$log_file" | tail -n 1 || true)"
   if [[ -z "$summary" ]]; then
     echo "error: could not parse Verus verification summary"
     cat "$log_file"
@@ -238,7 +246,6 @@ run_cargo_verus_verify_with_threshold() {
 
 LAST_VERIFIED_COUNT=""
 
-require_command rg "install ripgrep (https://github.com/BurntSushi/ripgrep)"
 
 if [[ "$FORBID_TRUSTED_ESCAPES" == "1" ]]; then
   echo "[check] Verifying non-test source tree excludes trusted proof escapes"
