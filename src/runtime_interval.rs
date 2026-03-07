@@ -1,5 +1,5 @@
 #[cfg(verus_keep_ghost)]
-use crate::interval::Interval;
+use crate::interval::{Interval, pow2_spec, floor_dyadic_spec, ceil_dyadic_spec};
 #[cfg(verus_keep_ghost)]
 use verus_rational::Rational;
 #[cfg(verus_keep_ghost)]
@@ -8,6 +8,7 @@ use vstd::prelude::*;
 use vstd::view::View;
 
 use verus_rational::RuntimeRational;
+use verus_bigint::{RuntimeBigIntWitness, RuntimeBigNatWitness};
 
 #[cfg(not(verus_keep_ghost))]
 compile_error!(
@@ -916,6 +917,335 @@ impl View for RuntimeInterval {
 
     open spec fn view(&self) -> Interval {
         self.model@
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Dyadic reduction exec helpers
+// ══════════════════════════════════════════════════════════════════
+
+/// Build 2^k as a RuntimeBigNatWitness by repeated doubling.
+pub fn build_pow2(k: u32) -> (out: RuntimeBigNatWitness)
+    ensures
+        out.wf_spec(),
+        out.model@ == pow2_spec(k as nat),
+{
+    let mut result = RuntimeBigNatWitness::from_u32(1);
+    let two = RuntimeBigNatWitness::from_u32(2);
+    let mut i: u32 = 0;
+    while i < k
+        invariant
+            result.wf_spec(),
+            two.wf_spec(),
+            two.model@ == 2,
+            0 <= i <= k,
+            result.model@ == pow2_spec(i as nat),
+        decreases k - i,
+    {
+        result = result.mul(&two);
+        i = i + 1;
+        proof {
+            // pow2_spec(i) == 2 * pow2_spec(i-1)
+            assert(pow2_spec(i as nat) == 2 * pow2_spec((i - 1) as nat));
+        }
+    }
+    result
+}
+
+/// Euclidean floor division: returns a / b (rounds toward -infinity) for b > 0.
+/// Uses BigNat division on the magnitude and handles sign manually.
+fn euclidean_floor_div(a: &RuntimeBigIntWitness, b_nat: &RuntimeBigNatWitness) -> (out: RuntimeBigIntWitness)
+    requires
+        a.wf_spec(),
+        b_nat.wf_spec(),
+        b_nat.model@ > 0,
+    ensures
+        out.wf_spec(),
+        out.model@ == a.model@ / (b_nat.model@ as int),
+{
+    // Use BigNat division on magnitude: |a| = q_nat * b + r_nat, 0 <= r_nat < b
+    let (q_nat, r_nat) = a.magnitude.div_rem(b_nat);
+    if !a.is_negative {
+        // a >= 0: a = magnitude, so a / b = magnitude / b = q_nat
+        let out = RuntimeBigIntWitness::from_unsigned(q_nat);
+        proof {
+            let a_val = a.model@;
+            let b_val = b_nat.model@ as int;
+            let mag = a.magnitude.model@;
+            assert(a_val == mag as int);
+            assert(q_nat.model@ == mag / b_nat.model@);
+            assert(out.model@ == q_nat.model@ as int);
+            assert(out.model@ == (mag / b_nat.model@) as int);
+            assert((mag / b_nat.model@) as int == (mag as int) / b_val) by (nonlinear_arith)
+                requires mag == a_val as nat, b_val > 0, b_val == b_nat.model@ as int;
+        }
+        out
+    } else {
+        // a < 0: a = -magnitude
+        let rem_zero = r_nat.is_zero();
+        if rem_zero {
+            // a = -magnitude, magnitude divisible by b: a / b = -(magnitude / b)
+            let out = RuntimeBigIntWitness::from_sign_and_magnitude(true, q_nat);
+            proof {
+                let a_val = a.model@;
+                let b_val = b_nat.model@ as int;
+                let mag = a.magnitude.model@;
+                assert(a_val == -(mag as int));
+                assert(q_nat.model@ == mag / b_nat.model@);
+                assert(r_nat.model@ == 0);
+                assert(mag % b_nat.model@ == 0nat);
+                // a_val = -(mag) = -(q_nat * b_nat + 0) = -q_nat * b
+                // So a / b = -q_nat with remainder 0
+                let qn = q_nat.model@ as int;
+                // Fundamental: a == (a/b)*b + a%b
+                assert(mag == (mag / b_nat.model@) * b_nat.model@ + mag % b_nat.model@);
+                // Since remainder is 0:
+                assert(mag == (mag / b_nat.model@) * b_nat.model@);
+                assert(mag == q_nat.model@ * b_nat.model@);
+                assert(a_val == -(qn * b_val)) by (nonlinear_arith)
+                    requires a_val == -(mag as int), (mag as int) == qn * b_val;
+                assert(a_val == (-qn) * b_val) by (nonlinear_arith)
+                    requires a_val == -(qn * b_val);
+                assert(-qn == a_val / b_val) by (nonlinear_arith)
+                    requires a_val == (-qn) * b_val, b_val > 0;
+                // out.model@ = model_from_sign_and_magnitude(true, q_nat.model@)
+                // If q_nat.model@ > 0: out.model@ = -(q_nat.model@ as int) = -qn
+                // If q_nat.model@ == 0: out.is_negative is false, out.model@ = 0 = -0
+                if q_nat.model@ > 0 {
+                    assert(out.model@ == -(q_nat.model@ as int));
+                    assert(out.model@ == -qn);
+                } else {
+                    assert(q_nat.model@ == 0nat);
+                    assert(out.model@ == 0);
+                    assert(-qn == 0int) by (nonlinear_arith)
+                        requires qn == 0;
+                }
+            }
+            out
+        } else {
+            // a < 0, remainder != 0: a / b = -(magnitude / b + 1)
+            // Because: a = -magnitude = -(q_nat * b + r_nat), r_nat > 0
+            //        = (-q_nat - 1) * b + (b - r_nat)
+            //   with 0 < b - r_nat < b, so Euclidean quotient = -q_nat - 1
+            let one = RuntimeBigNatWitness::from_u32(1);
+            let q_plus_one = q_nat.add(&one);
+            let out = RuntimeBigIntWitness::from_sign_and_magnitude(true, q_plus_one);
+            proof {
+                let a_val = a.model@;
+                let b_val = b_nat.model@ as int;
+                let mag = a.magnitude.model@;
+                assert(a_val == -(mag as int));
+                let qn = q_nat.model@;
+                let rn = r_nat.model@;
+                assert(mag == qn * b_nat.model@ + rn);
+                assert(rn > 0nat);
+                assert(rn < b_nat.model@);
+                // q_plus_one.model@ == qn + 1
+                assert(q_plus_one.model@ == qn + 1);
+                let bn = b_nat.model@;
+                // Work in int to avoid nat subtraction issues
+                let eq: int = -((qn as int) + 1);
+                let er: int = (bn as int) - (rn as int);
+                // a_val = eq * b_val + er
+                assert(a_val == -(mag as int));
+                assert((mag as int) == (qn as int) * (bn as int) + (rn as int)) by (nonlinear_arith)
+                    requires mag == qn * bn + rn;
+                assert(a_val == eq * b_val + er) by (nonlinear_arith)
+                    requires
+                        a_val == -((qn as int) * (bn as int) + (rn as int)),
+                        eq == -((qn as int) + 1),
+                        er == (bn as int) - (rn as int),
+                        b_val == bn as int,
+                ;
+                // 0 < er < b_val
+                assert(er > 0) by (nonlinear_arith)
+                    requires (rn as int) > 0, (rn as int) < (bn as int), er == (bn as int) - (rn as int);
+                assert(er < b_val) by (nonlinear_arith)
+                    requires (rn as int) > 0, b_val == bn as int, er == (bn as int) - (rn as int);
+                assert(eq == a_val / b_val) by (nonlinear_arith)
+                    requires
+                        a_val == eq * b_val + er,
+                        0 < er,
+                        er < b_val,
+                ;
+                // out.model@
+                assert(q_plus_one.model@ > 0nat);
+                assert(out.model@ == -((qn + 1) as int));
+                assert(out.model@ == eq) by (nonlinear_arith)
+                    requires out.model@ == -((qn + 1) as int), eq == -((qn as int) + 1);
+            }
+            out
+        }
+    }
+}
+
+/// Floor dyadic: floor(r * 2^k) / 2^k.
+pub fn floor_dyadic_rational(r: &RuntimeRational, pow2_wit: &RuntimeBigNatWitness, Ghost(k): Ghost<nat>) -> (out: RuntimeRational)
+    requires
+        r.wf_spec(),
+        pow2_wit.wf_spec(),
+        pow2_wit.model@ == pow2_spec(k),
+    ensures
+        out.wf_spec(),
+        out@ == floor_dyadic_spec(r@, k),
+{
+    proof { crate::interval::lemma_pow2_positive(k); }
+    // scaled_num = r.numerator * pow2 (BigInt * BigNat → BigInt)
+    let pow2_signed = RuntimeBigIntWitness::from_unsigned(pow2_wit.copy_small_total());
+    let scaled_num = r.numerator.mul(&pow2_signed);
+    // q = floor(scaled_num / r.denominator) using Euclidean division via BigNat
+    let denom_copy = r.denominator.copy_small_total();
+    let q = euclidean_floor_div(&scaled_num, &denom_copy);
+    // Build result: q / pow2
+    let denom_out = pow2_wit.copy_small_total();
+    let ghost model = floor_dyadic_spec(r@, k);
+    proof {
+        let pow2 = pow2_spec(k) as int;
+        assert(pow2 > 0);
+        assert(model.num == (r@.num * pow2) / r@.denom());
+        assert(model.denom() == pow2) by {
+            assert(model == Rational::from_frac_spec(
+                (r@.num * pow2) / r@.denom(), pow2));
+        }
+        // q.model@ = (r.numerator.model@ * pow2) / (r.denominator.model@ as int)
+        assert(scaled_num.model@ == r.numerator.model@ * (pow2_spec(k) as int));
+        assert(q.model@ == scaled_num.model@ / (denom_copy.model@ as int));
+        // Need: q.model@ == model.num
+        // q.model@ = (nn * pow2) / D  where nn = r.numerator.model@, D = r.denominator.model@ as int
+        // model.num = (n * pow2) / d   where n = r@.num, d = r@.denom()
+        // From wf: nn * d == n * D with D > 0, d > 0
+        // Cross-multiplication: (nn * pow2) * d == (n * pow2) * D
+        // => (nn * pow2) / D == (n * pow2) / d
+        let nn = r.numerator.model@;
+        let dd = r.denominator.model@ as int;
+        let n = r@.num;
+        let d = r@.denom();
+        assert(nn * d == n * dd);
+        assert(dd > 0);
+        assert(d > 0) by { Rational::lemma_denom_positive(r@); }
+        assert((nn * pow2) * d == (n * pow2) * dd) by (nonlinear_arith)
+            requires nn * d == n * dd;
+        assert((nn * pow2) / dd == (n * pow2) / d) by (nonlinear_arith)
+            requires
+                (nn * pow2) * d == (n * pow2) * dd,
+                dd > 0,
+                d > 0,
+        {}
+    }
+    RuntimeRational {
+        numerator: q,
+        denominator: denom_out,
+        model: Ghost(model),
+    }
+}
+
+/// Ceil dyadic: ceil(r * 2^k) / 2^k, via negate-floor-negate.
+pub fn ceil_dyadic_rational(r: &RuntimeRational, pow2_wit: &RuntimeBigNatWitness, Ghost(k): Ghost<nat>) -> (out: RuntimeRational)
+    requires
+        r.wf_spec(),
+        pow2_wit.wf_spec(),
+        pow2_wit.model@ == pow2_spec(k),
+    ensures
+        out.wf_spec(),
+        out@ == ceil_dyadic_spec(r@, k),
+{
+    proof { crate::interval::lemma_pow2_positive(k); }
+    let neg_r = r.neg();
+    let floor_neg = floor_dyadic_rational(&neg_r, pow2_wit, Ghost(k));
+    let result = floor_neg.neg();
+    proof {
+        let pow2 = pow2_spec(k) as int;
+        // floor_neg@ == floor_dyadic_spec(neg_r@, k)
+        //            == floor_dyadic_spec(r@.neg_spec(), k)
+        //            == from_frac_spec((r@.neg_spec().num * pow2) / r@.neg_spec().denom(), pow2)
+        // neg_r@ = r@.neg_spec() = Rational { num: -r@.num, den: r@.den }
+        // So: floor_neg@.num = ((-r@.num) * pow2) / r@.denom()
+        //     floor_neg@.denom() = pow2
+        // result@ = floor_neg@.neg_spec()
+        //         = Rational { num: -floor_neg@.num, den: floor_neg@.den }
+        //         = from_frac_spec(-((-r@.num * pow2) / r@.denom()), pow2)
+        // Which matches ceil_dyadic_spec(r@, k) definition.
+        assert(neg_r@ == r@.neg_spec());
+        assert(neg_r@.num == -r@.num);
+        assert(neg_r@.den == r@.den);
+        assert(neg_r@.denom() == r@.denom());
+        assert(floor_neg@ == floor_dyadic_spec(neg_r@, k));
+        assert(result@ == floor_neg@.neg_spec());
+        // floor_dyadic_spec(neg_r@, k) = from_frac_spec((-r@.num * pow2) / r@.denom(), pow2)
+        let fd = floor_dyadic_spec(neg_r@, k);
+        assert(fd == Rational::from_frac_spec((-r@.num * pow2) / r@.denom(), pow2));
+        assert(fd.num == (-r@.num * pow2) / r@.denom()) by {
+            assert(pow2 > 0);
+        }
+        assert(fd.den == (pow2 - 1) as nat) by {
+            assert(pow2 > 0);
+        }
+        // result@ = fd.neg_spec() = Rational { num: -fd.num, den: fd.den }
+        assert(result@.num == -fd.num);
+        assert(result@.den == fd.den);
+        // ceil_dyadic_spec(r@, k) = from_frac_spec(-((-r@.num * pow2) / r@.denom()), pow2)
+        let cd = ceil_dyadic_spec(r@, k);
+        assert(cd.num == -((-r@.num * pow2) / r@.denom())) by {
+            assert(pow2 > 0);
+        }
+        assert(cd.den == (pow2 - 1) as nat) by {
+            assert(pow2 > 0);
+        }
+        assert(result@.num == cd.num);
+        assert(result@.den == cd.den);
+        assert(result@ == cd);
+    }
+    result
+}
+
+impl RuntimeInterval {
+    /// Reduce: snap endpoints to dyadic rationals with denominator 2^k.
+    pub fn reduce(&self, k: u32) -> (out: Self)
+        requires
+            self.wf_spec(),
+        ensures
+            out@ == self@.reduce_spec(k as nat),
+            out.wf_spec(),
+    {
+        let pow2_wit = build_pow2(k);
+        let lo = floor_dyadic_rational(&self.lo, &pow2_wit, Ghost(k as nat));
+        let hi = ceil_dyadic_rational(&self.hi, &pow2_wit, Ghost(k as nat));
+        let ghost model = self@.reduce_spec(k as nat);
+        proof {
+            self@.lemma_reduce_wf(k as nat);
+        }
+        RuntimeInterval {
+            lo,
+            hi,
+            model: Ghost(model),
+        }
+    }
+
+    /// Normalize: GCD-reduce both endpoints.
+    pub fn normalize(&self) -> (out: Self)
+        requires
+            self.wf_spec(),
+        ensures
+            out.wf_spec(),
+            out@.lo.eqv_spec(self@.lo),
+            out@.hi.eqv_spec(self@.hi),
+    {
+        let lo = self.lo.normalize();
+        let hi = self.hi.normalize();
+        let ghost model = Interval { lo: lo@, hi: hi@ };
+        proof {
+            // wf: lo@ <= hi@ follows from lo@ eqv self@.lo, hi@ eqv self@.hi, self@.lo <= self@.hi
+            Rational::lemma_eqv_symmetric(lo@, self@.lo);
+            verus_algebra::lemmas::ordered_ring_lemmas::lemma_le_congruence_left::<Rational>(
+                self@.lo, lo@, self@.hi);
+            verus_algebra::lemmas::ordered_ring_lemmas::lemma_le_congruence_right::<Rational>(
+                lo@, self@.hi, hi@);
+        }
+        RuntimeInterval {
+            lo,
+            hi,
+            model: Ghost(model),
+        }
     }
 }
 
