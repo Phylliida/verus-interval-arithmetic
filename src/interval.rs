@@ -4278,4 +4278,179 @@ impl Interval {
     }
 }
 
+// ══════════════════════════════════════════════════════════════════
+// Dyadic reduction: snap endpoints to nearest dyadic rational
+// with denominator 2^k, widening the interval to preserve containment.
+// ══════════════════════════════════════════════════════════════════
+
+/// 2^k as a nat (recursive).
+pub open spec fn pow2_spec(k: nat) -> nat
+    decreases k,
+{
+    if k == 0 {
+        1
+    } else {
+        2 * pow2_spec((k - 1) as nat)
+    }
+}
+
+/// Floor dyadic: floor(r * 2^k) / 2^k.
+/// Rounds r down to the nearest multiple of 1/2^k.
+pub open spec fn floor_dyadic_spec(r: Rational, k: nat) -> Rational {
+    let pow2 = pow2_spec(k) as int;
+    Rational::from_frac_spec(
+        (r.num * pow2) / r.denom(),
+        pow2,
+    )
+}
+
+/// Ceil dyadic: ceil(r * 2^k) / 2^k.
+/// Rounds r up to the nearest multiple of 1/2^k.
+/// Uses negate-floor-negate: ceil(x) = -floor(-x).
+pub open spec fn ceil_dyadic_spec(r: Rational, k: nat) -> Rational {
+    let pow2 = pow2_spec(k) as int;
+    Rational::from_frac_spec(
+        -((-r.num * pow2) / r.denom()),
+        pow2,
+    )
+}
+
+impl Interval {
+    /// Reduce: snap endpoints to dyadic rationals with denominator 2^k.
+    /// Floor on lo (round down), ceil on hi (round up).
+    pub open spec fn reduce_spec(self, k: nat) -> Interval {
+        Interval {
+            lo: floor_dyadic_spec(self.lo, k),
+            hi: ceil_dyadic_spec(self.hi, k),
+        }
+    }
+}
+
+// ── Dyadic reduction proofs ──────────────────────────────────────
+
+/// pow2_spec(k) > 0 for all k.
+pub proof fn lemma_pow2_positive(k: nat)
+    ensures
+        pow2_spec(k) > 0,
+    decreases k,
+{
+    if k > 0 {
+        lemma_pow2_positive((k - 1) as nat);
+    }
+}
+
+/// floor_dyadic(r, k) <= r.
+pub proof fn lemma_floor_dyadic_le(r: Rational, k: nat)
+    ensures
+        floor_dyadic_spec(r, k).le_spec(r),
+{
+    lemma_pow2_positive(k);
+    Rational::lemma_denom_positive(r);
+    let pow2 = pow2_spec(k) as int;
+    let scaled = r.num * pow2;
+    let d = r.denom();
+    let q = scaled / d;
+    // Euclidean division property: q * d <= scaled
+    // i.e. (scaled / d) * d <= scaled (for d > 0)
+    assert(q * d <= scaled) by (nonlinear_arith)
+        requires d > 0, q == scaled / d,
+    {
+        // Verus int / is Euclidean: a == (a/b)*b + a%b, 0 <= a%b < b
+        assert(scaled == q * d + scaled % d);
+        assert(scaled % d >= 0);
+    }
+    // floor_dyadic_spec(r, k) = from_frac_spec(q, pow2)
+    // Since pow2 > 0: .num = q, .denom() = pow2
+    let fd = floor_dyadic_spec(r, k);
+    assert(fd.num == q);
+    assert(fd.denom() == pow2) by {
+        assert(pow2 > 0);
+    }
+    // le_spec: fd.num * r.denom() <= r.num * fd.denom()
+    //        = q * d <= r.num * pow2 = scaled
+    assert(fd.num * r.denom() <= r.num * fd.denom()) by (nonlinear_arith)
+        requires
+            q * d <= scaled,
+            scaled == r.num * pow2,
+            fd.num == q,
+            fd.denom() == pow2,
+            d == r.denom(),
+    {}
+}
+
+/// r <= ceil_dyadic(r, k).
+pub proof fn lemma_ceil_dyadic_ge(r: Rational, k: nat)
+    ensures
+        r.le_spec(ceil_dyadic_spec(r, k)),
+{
+    lemma_pow2_positive(k);
+    Rational::lemma_denom_positive(r);
+    let pow2 = pow2_spec(k) as int;
+    let neg_scaled = -r.num * pow2;
+    let d = r.denom();
+    let q_neg = neg_scaled / d;
+    // Euclidean: q_neg * d <= neg_scaled
+    assert(q_neg * d <= neg_scaled) by (nonlinear_arith)
+        requires d > 0, q_neg == neg_scaled / d,
+    {
+        assert(neg_scaled == q_neg * d + neg_scaled % d);
+        assert(neg_scaled % d >= 0);
+    }
+    // ceil_val = -q_neg
+    let cd = ceil_dyadic_spec(r, k);
+    assert(cd.num == -q_neg);
+    assert(cd.denom() == pow2) by {
+        assert(pow2 > 0);
+    }
+    // le_spec: r.num * cd.denom() <= cd.num * r.denom()
+    //        = r.num * pow2 <= (-q_neg) * d
+    // From q_neg * d <= -r.num * pow2:
+    //   -q_neg * d >= r.num * pow2
+    assert(r.num * cd.denom() <= cd.num * r.denom()) by (nonlinear_arith)
+        requires
+            q_neg * d <= neg_scaled,
+            neg_scaled == -r.num * pow2,
+            cd.num == -q_neg,
+            cd.denom() == pow2,
+            d == r.denom(),
+    {}
+}
+
+impl Interval {
+    /// Reduced interval is well-formed.
+    pub proof fn lemma_reduce_wf(self, k: nat)
+        requires
+            self.wf_spec(),
+        ensures
+            self.reduce_spec(k).wf_spec(),
+    {
+        let red = self.reduce_spec(k);
+        // Need: red.lo.le_spec(red.hi)
+        // red.lo = floor_dyadic(self.lo, k) <= self.lo <= self.hi <= ceil_dyadic(self.hi, k) = red.hi
+        lemma_floor_dyadic_le(self.lo, k);
+        lemma_ceil_dyadic_ge(self.hi, k);
+        // floor_dyadic(lo, k) <= lo <= hi <= ceil_dyadic(hi, k)
+        Rational::lemma_le_transitive(red.lo, self.lo, self.hi);
+        Rational::lemma_le_transitive(red.lo, self.hi, red.hi);
+    }
+
+    /// Reduction preserves containment: if x in self, then x in self.reduce(k).
+    pub proof fn lemma_reduce_containment(self, k: nat, x: Rational)
+        requires
+            self.wf_spec(),
+            self.contains_spec(x),
+        ensures
+            self.reduce_spec(k).contains_spec(x),
+    {
+        let red = self.reduce_spec(k);
+        // x in self means: self.lo <= x <= self.hi
+        // red.lo = floor_dyadic(self.lo, k) <= self.lo <= x
+        lemma_floor_dyadic_le(self.lo, k);
+        Rational::lemma_le_transitive(red.lo, self.lo, x);
+        // x <= self.hi <= ceil_dyadic(self.hi, k) = red.hi
+        lemma_ceil_dyadic_ge(self.hi, k);
+        Rational::lemma_le_transitive(x, self.hi, red.hi);
+    }
+}
+
 } // verus!
