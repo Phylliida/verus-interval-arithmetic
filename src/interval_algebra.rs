@@ -1,7 +1,7 @@
-use vstd::prelude::*;
-use verus_rational::Rational;
-use verus_algebra::traits::*;
 use crate::interval::Interval;
+use verus_algebra::traits::*;
+use verus_rational::Rational;
+use vstd::prelude::*;
 
 verus! {
 
@@ -25,6 +25,11 @@ impl Equivalence for Interval {
     proof fn axiom_eqv_transitive(a: Self, b: Self, c: Self) {
         Rational::lemma_eqv_transitive(a.lo, b.lo, c.lo);
         Rational::lemma_eqv_transitive(a.hi, b.hi, c.hi);
+    }
+
+    proof fn axiom_eq_implies_eqv(a: Self, b: Self) {
+        // Note: Interval uses Rational's eqv_spec directly
+        // If intervals are equal (==), their lo and hi are equal
     }
 }
 
