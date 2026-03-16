@@ -11,12 +11,6 @@ use verus_rational::RuntimeRational;
 use verus_bigint::{RuntimeBigIntWitness, RuntimeBigNatWitness};
 
 #[cfg(not(verus_keep_ghost))]
-compile_error!(
-    "verus-interval-arithmetic exposes a single verified implementation; \
-     build with Verus (`cfg(verus_keep_ghost)`, e.g. `cargo verus verify`)"
-);
-
-#[cfg(not(verus_keep_ghost))]
 pub struct RuntimeInterval;
 
 #[cfg(verus_keep_ghost)]
