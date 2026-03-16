@@ -2,6 +2,8 @@
 use crate::interval::{Interval, pow2_spec, floor_dyadic_spec, ceil_dyadic_spec};
 #[cfg(verus_keep_ghost)]
 use verus_rational::Rational;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::Ghost;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
@@ -10,10 +12,6 @@ use vstd::view::View;
 use verus_rational::RuntimeRational;
 use verus_bigint::{RuntimeBigIntWitness, RuntimeBigNatWitness};
 
-#[cfg(not(verus_keep_ghost))]
-pub struct RuntimeInterval;
-
-#[cfg(verus_keep_ghost)]
 verus! {
 
 /// Runtime interval backed by RuntimeRational endpoints.
