@@ -1200,11 +1200,24 @@ impl RuntimeInterval {
             out.wf_spec(),
     {
         let pow2_wit = build_pow2(k);
-        let lo = floor_dyadic_rational(&self.lo, &pow2_wit, Ghost(k as nat));
-        let hi = ceil_dyadic_rational(&self.hi, &pow2_wit, Ghost(k as nat));
-        let ghost model = self@.reduce_spec(k as nat);
+        self.reduce_with_pow2(&pow2_wit, Ghost(k as nat))
+    }
+
+    /// Like `reduce`, but takes a precomputed 2^k witness to avoid rebuilding it.
+    pub fn reduce_with_pow2(&self, pow2_wit: &RuntimeBigNatWitness, Ghost(k): Ghost<nat>) -> (out: Self)
+        requires
+            self.wf_spec(),
+            pow2_wit.wf_spec(),
+            pow2_wit.model@ == pow2_spec(k),
+        ensures
+            out@ == self@.reduce_spec(k),
+            out.wf_spec(),
+    {
+        let lo = floor_dyadic_rational(&self.lo, pow2_wit, Ghost(k));
+        let hi = ceil_dyadic_rational(&self.hi, pow2_wit, Ghost(k));
+        let ghost model = self@.reduce_spec(k);
         proof {
-            self@.lemma_reduce_wf(k as nat);
+            self@.lemma_reduce_wf(k);
         }
         RuntimeInterval {
             lo,
