@@ -7,3 +7,4 @@ pub use interval::Interval;
 
 pub mod runtime_interval;
 pub use runtime_interval::RuntimeInterval;
+pub use runtime_interval::build_pow2;
