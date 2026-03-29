@@ -14,7 +14,7 @@ use verus_bigint::{RuntimeBigIntWitness, RuntimeBigNatWitness};
 
 verus! {
 
-/// Runtime interval backed by RuntimeRational endpoints.
+///  Runtime interval backed by RuntimeRational endpoints.
 pub struct RuntimeInterval {
     pub lo: RuntimeRational,
     pub hi: RuntimeRational,
@@ -22,7 +22,7 @@ pub struct RuntimeInterval {
 }
 
 impl RuntimeInterval {
-    /// Well-formedness invariant tying runtime witnesses to the ghost model.
+    ///  Well-formedness invariant tying runtime witnesses to the ghost model.
     pub open spec fn wf_spec(&self) -> bool {
         &&& self.lo.wf_spec()
         &&& self.hi.wf_spec()
@@ -31,8 +31,8 @@ impl RuntimeInterval {
         &&& self@.wf_spec()
     }
 
-    /// Construct an interval from ordered endpoints [lo, hi].
-    /// Takes ownership of both RuntimeRationals.
+    ///  Construct an interval from ordered endpoints [lo, hi].
+    ///  Takes ownership of both RuntimeRationals.
     pub fn from_endpoints(lo: RuntimeRational, hi: RuntimeRational) -> (out: Self)
         requires
             lo.wf_spec(),
@@ -53,7 +53,7 @@ impl RuntimeInterval {
         }
     }
 
-    /// Construct a point interval [x, x] from a single rational.
+    ///  Construct a point interval [x, x] from a single rational.
     pub fn from_point(x: &RuntimeRational) -> (out: Self)
         requires
             x.wf_spec(),
@@ -80,9 +80,9 @@ impl RuntimeInterval {
         }
     }
 
-    // ── Interval arithmetic exec functions ───────────────────────
+    //  ── Interval arithmetic exec functions ───────────────────────
 
-    /// Addition: [a,b] + [c,d] = [a+c, b+d].
+    ///  Addition: [a,b] + [c,d] = [a+c, b+d].
     pub fn add(&self, rhs: &Self) -> (out: Self)
         requires
             self.wf_spec(),
@@ -105,7 +105,7 @@ impl RuntimeInterval {
         out
     }
 
-    /// Negation: -[a,b] = [-b, -a].
+    ///  Negation: -[a,b] = [-b, -a].
     pub fn neg(&self) -> (out: Self)
         requires
             self.wf_spec(),
@@ -127,7 +127,7 @@ impl RuntimeInterval {
         out
     }
 
-    /// Subtraction: [a,b] - [c,d] = [a-d, b-c].
+    ///  Subtraction: [a,b] - [c,d] = [a-d, b-c].
     pub fn sub(&self, rhs: &Self) -> (out: Self)
         requires
             self.wf_spec(),
@@ -150,7 +150,7 @@ impl RuntimeInterval {
         out
     }
 
-    /// Multiplication: [a,b] * [c,d] = [min(ac,ad,bc,bd), max(ac,ad,bc,bd)].
+    ///  Multiplication: [a,b] * [c,d] = [min(ac,ad,bc,bd), max(ac,ad,bc,bd)].
     pub fn mul(&self, rhs: &Self) -> (out: Self)
         requires
             self.wf_spec(),
@@ -172,10 +172,10 @@ impl RuntimeInterval {
             model: Ghost(iv),
         };
         proof {
-            // wf: lo <= hi because min(S) <= max(S) for any non-empty S.
-            // min of the four is <= max of the four.
-            // The min/max chain produces correct values by the spec
-            // definitions of min_spec/max_spec.
+            //  wf: lo <= hi because min(S) <= max(S) for any non-empty S.
+            //  min of the four is <= max of the four.
+            //  The min/max chain produces correct values by the spec
+            //  definitions of min_spec/max_spec.
             Rational::lemma_min_le_left(
                 self@.lo.mul_spec(rhs@.lo).min_spec(self@.lo.mul_spec(rhs@.hi)).min_spec(self@.hi.mul_spec(rhs@.lo)),
                 self@.hi.mul_spec(rhs@.hi));
@@ -186,7 +186,7 @@ impl RuntimeInterval {
         out
     }
 
-    /// Scalar multiplication: k * [a,b].
+    ///  Scalar multiplication: k * [a,b].
     pub fn scale(scalar: &RuntimeRational, iv: &Self) -> (out: Self)
         requires
             scalar.wf_spec(),
@@ -211,7 +211,7 @@ impl RuntimeInterval {
         }
         out
     }
-    /// Absolute value: |[a,b]|.
+    ///  Absolute value: |[a,b]|.
     pub fn abs(&self) -> (out: Self)
         requires
             self.wf_spec(),
@@ -222,7 +222,7 @@ impl RuntimeInterval {
         let zero = RuntimeRational::from_int(0i64);
         let lo_nonneg = zero.le(&self.lo);
         if lo_nonneg {
-            // lo >= 0: entirely nonneg, abs = self
+            //  lo >= 0: entirely nonneg, abs = self
             let lo = RuntimeRational {
                 numerator: self.lo.numerator.copy_small_total(),
                 denominator: self.lo.denominator.copy_small_total(),
@@ -238,14 +238,14 @@ impl RuntimeInterval {
         } else {
             let hi_nonpos = self.hi.le(&zero);
             if hi_nonpos {
-                // hi <= 0: entirely nonpos, abs = neg
+                //  hi <= 0: entirely nonpos, abs = neg
                 let out = self.neg();
                 proof {
                     Interval::lemma_neg_wf(self@);
                 }
                 out
             } else {
-                // spans zero: [0, max(-lo, hi)]
+                //  spans zero: [0, max(-lo, hi)]
                 let neg_lo = self.lo.neg();
                 let hi_copy = RuntimeRational {
                     numerator: self.hi.numerator.copy_small_total(),
@@ -268,8 +268,8 @@ impl RuntimeInterval {
         }
     }
 
-    /// Reciprocal: 1/[a,b] = [1/b, 1/a].
-    /// Requires 0 not in the interval (entirely positive or entirely negative).
+    ///  Reciprocal: 1/[a,b] = [1/b, 1/a].
+    ///  Requires 0 not in the interval (entirely positive or entirely negative).
     pub fn recip(&self) -> (out: Option<Self>)
         requires
             self.wf_spec(),
@@ -281,38 +281,38 @@ impl RuntimeInterval {
                     &&& r@ == self@.recip_spec()
                     &&& r.wf_spec()
                 },
-                Option::None => false,  // always succeeds given precondition
+                Option::None => false,  //  always succeeds given precondition
             },
     {
-        // Compute 1/hi and 1/lo
+        //  Compute 1/hi and 1/lo
         let inv_hi = self.hi.recip();
         let inv_lo = self.lo.recip();
-        // Both must succeed since 0 is not in the interval.
+        //  Both must succeed since 0 is not in the interval.
         proof {
-            // hi != 0 and lo != 0 since 0 not in [lo, hi]
+            //  hi != 0 and lo != 0 since 0 not in [lo, hi]
             let zero = Rational::from_int_spec(0);
             if zero.lt_spec(self@.lo) {
                 Rational::lemma_lt_implies_le(zero, self@.lo);
                 Rational::lemma_le_transitive(zero, self@.lo, self@.hi);
-                // 0 <= hi, and 0 < lo, so both nonzero.
-                // lo != 0 trivially (0 < lo).
-                // hi != 0: if hi == 0, then lo <= hi = 0, contradicting 0 < lo.
-                // We need !lo@.eqv_spec(0) and !hi@.eqv_spec(0).
+                //  0 <= hi, and 0 < lo, so both nonzero.
+                //  lo != 0 trivially (0 < lo).
+                //  hi != 0: if hi == 0, then lo <= hi = 0, contradicting 0 < lo.
+                //  We need !lo@.eqv_spec(0) and !hi@.eqv_spec(0).
                 Rational::lemma_eqv_zero_iff_num_zero(self@.lo);
                 Rational::lemma_eqv_zero_iff_num_zero(self@.hi);
                 Rational::lemma_denom_positive(self@.lo);
                 Rational::lemma_denom_positive(self@.hi);
                 Rational::lemma_denom_positive(zero);
-                // 0 < lo.num (from 0 < lo)
+                //  0 < lo.num (from 0 < lo)
                 assert(self@.lo.num > 0) by (nonlinear_arith)
                     requires zero.num * self@.lo.denom() < self@.lo.num * zero.denom(),
                         zero.num == 0, zero.denom() > 0;
-                // lo <= hi and lo.num > 0 implies hi.num > 0
+                //  lo <= hi and lo.num > 0 implies hi.num > 0
                 assert(self@.hi.num > 0) by (nonlinear_arith)
                     requires self@.lo.num * self@.hi.denom() <= self@.hi.num * self@.lo.denom(),
                         self@.lo.num > 0, self@.lo.denom() > 0, self@.hi.denom() > 0;
             } else {
-                // hi < 0, so both negative, both nonzero
+                //  hi < 0, so both negative, both nonzero
                 Rational::lemma_eqv_zero_iff_num_zero(self@.lo);
                 Rational::lemma_eqv_zero_iff_num_zero(self@.hi);
                 Rational::lemma_denom_positive(self@.lo);
@@ -340,8 +340,8 @@ impl RuntimeInterval {
         Option::Some(out)
     }
 
-    /// Division: [a,b] / [c,d] = [a,b] * (1/[c,d]).
-    /// Requires 0 not in the divisor interval.
+    ///  Division: [a,b] / [c,d] = [a,b] * (1/[c,d]).
+    ///  Requires 0 not in the divisor interval.
     pub fn div(&self, rhs: &Self) -> (out: Option<Self>)
         requires
             self.wf_spec(),
@@ -362,8 +362,8 @@ impl RuntimeInterval {
         let result = self.mul(&recip_iv);
         Option::Some(result)
     }
-    /// Intersection of two intervals.
-    /// Returns None if they don't overlap, Some(result) otherwise.
+    ///  Intersection of two intervals.
+    ///  Returns None if they don't overlap, Some(result) otherwise.
     pub fn intersect(&self, other: &Self) -> (out: Option<Self>)
         requires
             self.wf_spec(),
@@ -393,9 +393,9 @@ impl RuntimeInterval {
         }
     }
 
-    // ── Phase 4: Sign determination & comparison ─────────────────
+    //  ── Phase 4: Sign determination & comparison ─────────────────
 
-    /// Is the interval certainly positive? (lo > 0)
+    ///  Is the interval certainly positive? (lo > 0)
     pub fn certainly_positive(&self) -> (out: bool)
         requires self.wf_spec(),
         ensures out == self@.certainly_positive_spec(),
@@ -404,7 +404,7 @@ impl RuntimeInterval {
         zero.lt(&self.lo)
     }
 
-    /// Is the interval certainly negative? (hi < 0)
+    ///  Is the interval certainly negative? (hi < 0)
     pub fn certainly_negative(&self) -> (out: bool)
         requires self.wf_spec(),
         ensures out == self@.certainly_negative_spec(),
@@ -413,7 +413,7 @@ impl RuntimeInterval {
         self.hi.lt(&zero)
     }
 
-    /// Is the interval certainly zero? (point at 0)
+    ///  Is the interval certainly zero? (point at 0)
     pub fn certainly_zero(&self) -> (out: bool)
         requires self.wf_spec(),
         ensures out == self@.certainly_zero_spec(),
@@ -422,7 +422,7 @@ impl RuntimeInterval {
         self.lo.eq(&self.hi) && self.lo.eq(&zero)
     }
 
-    /// Is the interval certainly nonneg? (lo >= 0)
+    ///  Is the interval certainly nonneg? (lo >= 0)
     pub fn certainly_nonneg(&self) -> (out: bool)
         requires self.wf_spec(),
         ensures out == self@.certainly_nonneg_spec(),
@@ -431,7 +431,7 @@ impl RuntimeInterval {
         zero.le(&self.lo)
     }
 
-    /// Is the interval certainly nonpos? (hi <= 0)
+    ///  Is the interval certainly nonpos? (hi <= 0)
     pub fn certainly_nonpos(&self) -> (out: bool)
         requires self.wf_spec(),
         ensures out == self@.certainly_nonpos_spec(),
@@ -440,7 +440,7 @@ impl RuntimeInterval {
         self.hi.le(&zero)
     }
 
-    /// Does the interval possibly contain zero? (lo <= 0 <= hi)
+    ///  Does the interval possibly contain zero? (lo <= 0 <= hi)
     pub fn possibly_zero(&self) -> (out: bool)
         requires self.wf_spec(),
         ensures out == self@.possibly_zero_spec(),
@@ -449,7 +449,7 @@ impl RuntimeInterval {
         self.lo.le(&zero) && zero.le(&self.hi)
     }
 
-    /// Sign determination: 1 if positive, -1 if negative, 0 if zero, None if indeterminate.
+    ///  Sign determination: 1 if positive, -1 if negative, 0 if zero, None if indeterminate.
     pub fn sign_definite(&self) -> (out: Option<i8>)
         requires self.wf_spec(),
         ensures out == self@.sign_definite_spec(),
@@ -465,7 +465,7 @@ impl RuntimeInterval {
         }
     }
 
-    /// Is self certainly less than rhs? (self.hi < rhs.lo)
+    ///  Is self certainly less than rhs? (self.hi < rhs.lo)
     pub fn certainly_lt(&self, rhs: &Self) -> (out: bool)
         requires self.wf_spec(), rhs.wf_spec(),
         ensures out == self@.certainly_lt_spec(rhs@),
@@ -473,7 +473,7 @@ impl RuntimeInterval {
         self.hi.lt(&rhs.lo)
     }
 
-    /// Is self certainly <= rhs? (self.hi <= rhs.lo)
+    ///  Is self certainly <= rhs? (self.hi <= rhs.lo)
     pub fn certainly_le(&self, rhs: &Self) -> (out: bool)
         requires self.wf_spec(), rhs.wf_spec(),
         ensures out == self@.certainly_le_spec(rhs@),
@@ -481,7 +481,7 @@ impl RuntimeInterval {
         self.hi.le(&rhs.lo)
     }
 
-    /// Are both intervals the same point?
+    ///  Are both intervals the same point?
     pub fn certainly_equal(&self, rhs: &Self) -> (out: bool)
         requires self.wf_spec(), rhs.wf_spec(),
         ensures out == self@.certainly_equal_spec(rhs@),
@@ -489,7 +489,7 @@ impl RuntimeInterval {
         self.lo.eq(&self.hi) && rhs.lo.eq(&rhs.hi) && self.lo.eq(&rhs.lo)
     }
 
-    /// Is it possible that some x in self < some y in rhs? (self.lo < rhs.hi)
+    ///  Is it possible that some x in self < some y in rhs? (self.lo < rhs.hi)
     pub fn possibly_lt(&self, rhs: &Self) -> (out: bool)
         requires self.wf_spec(), rhs.wf_spec(),
         ensures out == self@.possibly_lt_spec(rhs@),
@@ -497,7 +497,7 @@ impl RuntimeInterval {
         self.lo.lt(&rhs.hi)
     }
 
-    /// Are the intervals disjoint?
+    ///  Are the intervals disjoint?
     pub fn disjoint(&self, rhs: &Self) -> (out: bool)
         requires self.wf_spec(), rhs.wf_spec(),
         ensures out == self@.disjoint_spec(rhs@),
@@ -505,7 +505,7 @@ impl RuntimeInterval {
         self.hi.lt(&rhs.lo) || rhs.hi.lt(&self.lo)
     }
 
-    /// Tighten to nonneg: clamp lo to max(0, lo).
+    ///  Tighten to nonneg: clamp lo to max(0, lo).
     pub fn tighten_nonneg(&self) -> (out: Self)
         requires
             self.wf_spec(),
@@ -528,15 +528,15 @@ impl RuntimeInterval {
             model: Ghost(iv),
         };
         proof {
-            // wf: max(0, lo) <= hi.
-            // Case: if 0 <= lo, max = lo, and lo <= hi from wf. ✓
-            // Case: if lo < 0, max = 0, and 0 <= hi from precondition. ✓
+            //  wf: max(0, lo) <= hi.
+            //  Case: if 0 <= lo, max = lo, and lo <= hi from wf. ✓
+            //  Case: if lo < 0, max = 0, and 0 <= hi from precondition. ✓
             Rational::lemma_trichotomy(Rational::from_int_spec(0), self@.lo);
         }
         out
     }
 
-    /// Tighten to nonpos: clamp hi to min(0, hi).
+    ///  Tighten to nonpos: clamp hi to min(0, hi).
     pub fn tighten_nonpos(&self) -> (out: Self)
         requires
             self.wf_spec(),
@@ -564,9 +564,9 @@ impl RuntimeInterval {
         out
     }
 
-    // ── Phase 5: Squaring, power, FMA ────────────────────────────
+    //  ── Phase 5: Squaring, power, FMA ────────────────────────────
 
-    /// Squaring: tighter than mul(self, self).
+    ///  Squaring: tighter than mul(self, self).
     pub fn square(&self) -> (out: Self)
         requires
             self.wf_spec(),
@@ -577,7 +577,7 @@ impl RuntimeInterval {
         let zero = RuntimeRational::from_int(0i64);
         let lo_nonneg = zero.le(&self.lo);
         if lo_nonneg {
-            // entirely nonneg: [lo², hi²]
+            //  entirely nonneg: [lo², hi²]
             let lo2 = self.lo.mul(&self.lo);
             let hi2 = self.hi.mul(&self.hi);
             let ghost iv = self@.square_spec();
@@ -591,7 +591,7 @@ impl RuntimeInterval {
         } else {
             let hi_nonpos = self.hi.le(&zero);
             if hi_nonpos {
-                // entirely nonpos: [hi², lo²]
+                //  entirely nonpos: [hi², lo²]
                 let lo2 = self.lo.mul(&self.lo);
                 let hi2 = self.hi.mul(&self.hi);
                 let ghost iv = self@.square_spec();
@@ -603,7 +603,7 @@ impl RuntimeInterval {
                 proof { Interval::lemma_square_wf(self@); }
                 out
             } else {
-                // spans zero: [0, max(lo², hi²)]
+                //  spans zero: [0, max(lo², hi²)]
                 let lo2 = self.lo.mul(&self.lo);
                 let hi2 = self.hi.mul(&self.hi);
                 let hi_out = lo2.max(&hi2);
@@ -620,7 +620,7 @@ impl RuntimeInterval {
         }
     }
 
-    /// Integer power (naive recursive).
+    ///  Integer power (naive recursive).
     pub fn pow(&self, n: u64) -> (out: Self)
         requires
             self.wf_spec(),
@@ -642,7 +642,7 @@ impl RuntimeInterval {
         }
     }
 
-    /// Fused multiply-add: self * mul_rhs + add_rhs.
+    ///  Fused multiply-add: self * mul_rhs + add_rhs.
     pub fn fma(&self, mul_rhs: &Self, add_rhs: &Self) -> (out: Self)
         requires
             self.wf_spec(),
@@ -655,9 +655,9 @@ impl RuntimeInterval {
         let product = self.mul(mul_rhs);
         product.add(add_rhs)
     }
-    // ── Phase 6: Subdivision & splitting ─────────────────────────
+    //  ── Phase 6: Subdivision & splitting ─────────────────────────
 
-    /// Bisect at midpoint: returns ([lo, mid], [mid, hi]).
+    ///  Bisect at midpoint: returns ([lo, mid], [mid, hi]).
     pub fn bisect(&self) -> (out: (Self, Self))
         requires
             self.wf_spec(),
@@ -671,19 +671,19 @@ impl RuntimeInterval {
         proof {
             Interval::lemma_bisect_wf(self@);
         }
-        // Copy mid for the right half
+        //  Copy mid for the right half
         let mid_copy = RuntimeRational {
             numerator: mid.numerator.copy_small_total(),
             denominator: mid.denominator.copy_small_total(),
             model: Ghost(mid@),
         };
-        // Copy lo for the left half
+        //  Copy lo for the left half
         let lo_copy = RuntimeRational {
             numerator: self.lo.numerator.copy_small_total(),
             denominator: self.lo.denominator.copy_small_total(),
             model: Ghost(self@.lo),
         };
-        // Copy hi for the right half
+        //  Copy hi for the right half
         let hi_copy = RuntimeRational {
             numerator: self.hi.numerator.copy_small_total(),
             denominator: self.hi.denominator.copy_small_total(),
@@ -702,7 +702,7 @@ impl RuntimeInterval {
         (left, right)
     }
 
-    /// Split at an arbitrary rational point p where lo ≤ p ≤ hi.
+    ///  Split at an arbitrary rational point p where lo ≤ p ≤ hi.
     pub fn split_at(&self, p: &RuntimeRational) -> (out: (Self, Self))
         requires
             self.wf_spec(),
@@ -717,7 +717,7 @@ impl RuntimeInterval {
         proof {
             Interval::lemma_split_at_wf(self@, p@);
         }
-        // Copy p for both halves
+        //  Copy p for both halves
         let p_copy1 = RuntimeRational {
             numerator: p.numerator.copy_small_total(),
             denominator: p.denominator.copy_small_total(),
@@ -728,7 +728,7 @@ impl RuntimeInterval {
             denominator: p.denominator.copy_small_total(),
             model: Ghost(p@),
         };
-        // Copy endpoints
+        //  Copy endpoints
         let lo_copy = RuntimeRational {
             numerator: self.lo.numerator.copy_small_total(),
             denominator: self.lo.denominator.copy_small_total(),
@@ -751,9 +751,9 @@ impl RuntimeInterval {
         };
         (left, right)
     }
-    // ── Phase 7: Scalar root-finding support ────────────────────
+    //  ── Phase 7: Scalar root-finding support ────────────────────
 
-    /// Check if two function values indicate a sign change.
+    ///  Check if two function values indicate a sign change.
     pub fn has_sign_change(f_lo: &RuntimeRational, f_hi: &RuntimeRational) -> (out: bool)
         requires
             f_lo.wf_spec(),
@@ -766,8 +766,8 @@ impl RuntimeInterval {
         (s_lo == 1i8 && s_hi == -1i8) || (s_lo == -1i8 && s_hi == 1i8)
     }
 
-    /// Scalar interval Newton step: N(X) = x_mid - f(x_mid)/f'(X) ∩ X.
-    /// Returns None if f'(X) contains zero or intersection is empty.
+    ///  Scalar interval Newton step: N(X) = x_mid - f(x_mid)/f'(X) ∩ X.
+    ///  Returns None if f'(X) contains zero or intersection is empty.
     pub fn scalar_newton_step(
         fx_mid: &RuntimeRational,
         fprime_interval: &Self,
@@ -797,15 +797,15 @@ impl RuntimeInterval {
         }
         let fx_point = Self::from_point(fx_mid);
         let x_point = Self::from_point(x_mid);
-        // div always succeeds since !possibly_zero
+        //  div always succeeds since !possibly_zero
         let quotient = fx_point.div(fprime_interval).unwrap();
         let candidate = x_point.sub(&quotient);
         candidate.intersect(x_interval)
     }
 
-    /// Interval Horner evaluation for a polynomial with given coefficients.
-    /// coeffs_view maps indices to the ghost Rational values.
-    /// Recursively evaluates c₀ + X*(c₁ + X*(c₂ + ...)).
+    ///  Interval Horner evaluation for a polynomial with given coefficients.
+    ///  coeffs_view maps indices to the ghost Rational values.
+    ///  Recursively evaluates c₀ + X*(c₁ + X*(c₂ + ...)).
     pub fn horner_eval(coeffs: &Vec<RuntimeRational>, x: &Self) -> (out: Self)
         requires
             x.wf_spec(),
@@ -825,11 +825,11 @@ impl RuntimeInterval {
             }
             Self::from_point(&zero)
         } else {
-            // c0 as point interval
+            //  c0 as point interval
             let c0 = &coeffs[0];
             let c0_iv = Self::from_point(c0);
 
-            // Build the rest of coefficients as a new Vec
+            //  Build the rest of coefficients as a new Vec
             let mut rest_vec: Vec<RuntimeRational> = Vec::new();
             let mut i: usize = 1;
             while i < coeffs.len()
@@ -851,17 +851,17 @@ impl RuntimeInterval {
                 i = i + 1;
             }
 
-            // Recursive call on rest
+            //  Recursive call on rest
             let inner = Self::horner_eval(&rest_vec, x);
 
-            // X * inner
+            //  X * inner
             let product = x.mul(&inner);
 
-            // c0 + X * inner
+            //  c0 + X * inner
             let result = c0_iv.add(&product);
 
             proof {
-                // Show rest_vec's ghost seq matches subrange
+                //  Show rest_vec's ghost seq matches subrange
                 let ghost rest_seq = Seq::new(rest_vec@.len() as nat, |i: int| rest_vec@[i]@);
                 let ghost expected_rest = coeffs_seq.subrange(1, coeffs_seq.len() as int);
                 assert(rest_seq.len() == expected_rest.len());
@@ -887,9 +887,9 @@ impl RuntimeInterval {
         }
     }
 
-    // ── Phase 8: Distance & Metric ──
+    //  ── Phase 8: Distance & Metric ──
 
-    /// Hausdorff distance: max(|lo₁ - lo₂|, |hi₁ - hi₂|).
+    ///  Hausdorff distance: max(|lo₁ - lo₂|, |hi₁ - hi₂|).
     pub fn hausdorff(&self, other: &Self) -> (out: RuntimeRational)
         requires
             self.wf_spec(),
@@ -912,11 +912,11 @@ impl View for RuntimeInterval {
     }
 }
 
-// ══════════════════════════════════════════════════════════════════
-// Dyadic reduction exec helpers
-// ══════════════════════════════════════════════════════════════════
+//  ══════════════════════════════════════════════════════════════════
+//  Dyadic reduction exec helpers
+//  ══════════════════════════════════════════════════════════════════
 
-/// Build 2^k as a RuntimeBigNatWitness by repeated doubling.
+///  Build 2^k as a RuntimeBigNatWitness by repeated doubling.
 pub fn build_pow2(k: u32) -> (out: RuntimeBigNatWitness)
     ensures
         out.wf_spec(),
@@ -937,15 +937,15 @@ pub fn build_pow2(k: u32) -> (out: RuntimeBigNatWitness)
         result = result.mul(&two);
         i = i + 1;
         proof {
-            // pow2_spec(i) == 2 * pow2_spec(i-1)
+            //  pow2_spec(i) == 2 * pow2_spec(i-1)
             assert(pow2_spec(i as nat) == 2 * pow2_spec((i - 1) as nat));
         }
     }
     result
 }
 
-/// Euclidean floor division: returns a / b (rounds toward -infinity) for b > 0.
-/// Uses BigNat division on the magnitude and handles sign manually.
+///  Euclidean floor division: returns a / b (rounds toward -infinity) for b > 0.
+///  Uses BigNat division on the magnitude and handles sign manually.
 fn euclidean_floor_div(a: &RuntimeBigIntWitness, b_nat: &RuntimeBigNatWitness) -> (out: RuntimeBigIntWitness)
     requires
         a.wf_spec(),
@@ -955,10 +955,10 @@ fn euclidean_floor_div(a: &RuntimeBigIntWitness, b_nat: &RuntimeBigNatWitness) -
         out.wf_spec(),
         out.model@ == a.model@ / (b_nat.model@ as int),
 {
-    // Use BigNat division on magnitude: |a| = q_nat * b + r_nat, 0 <= r_nat < b
+    //  Use BigNat division on magnitude: |a| = q_nat * b + r_nat, 0 <= r_nat < b
     let (q_nat, r_nat) = a.magnitude.div_rem(b_nat);
     if !a.is_negative {
-        // a >= 0: a = magnitude, so a / b = magnitude / b = q_nat
+        //  a >= 0: a = magnitude, so a / b = magnitude / b = q_nat
         let out = RuntimeBigIntWitness::from_unsigned(q_nat);
         proof {
             let a_val = a.model@;
@@ -973,10 +973,10 @@ fn euclidean_floor_div(a: &RuntimeBigIntWitness, b_nat: &RuntimeBigNatWitness) -
         }
         out
     } else {
-        // a < 0: a = -magnitude
+        //  a < 0: a = -magnitude
         let rem_zero = r_nat.is_zero();
         if rem_zero {
-            // a = -magnitude, magnitude divisible by b: a / b = -(magnitude / b)
+            //  a = -magnitude, magnitude divisible by b: a / b = -(magnitude / b)
             let out = RuntimeBigIntWitness::from_sign_and_magnitude(true, q_nat);
             proof {
                 let a_val = a.model@;
@@ -986,12 +986,12 @@ fn euclidean_floor_div(a: &RuntimeBigIntWitness, b_nat: &RuntimeBigNatWitness) -
                 assert(q_nat.model@ == mag / b_nat.model@);
                 assert(r_nat.model@ == 0);
                 assert(mag % b_nat.model@ == 0nat);
-                // a_val = -(mag) = -(q_nat * b_nat + 0) = -q_nat * b
-                // So a / b = -q_nat with remainder 0
+                //  a_val = -(mag) = -(q_nat * b_nat + 0) = -q_nat * b
+                //  So a / b = -q_nat with remainder 0
                 let qn = q_nat.model@ as int;
-                // Fundamental: a == (a/b)*b + a%b
+                //  Fundamental: a == (a/b)*b + a%b
                 assert(mag == (mag / b_nat.model@) * b_nat.model@ + mag % b_nat.model@);
-                // Since remainder is 0:
+                //  Since remainder is 0:
                 assert(mag == (mag / b_nat.model@) * b_nat.model@);
                 assert(mag == q_nat.model@ * b_nat.model@);
                 assert(a_val == -(qn * b_val)) by (nonlinear_arith)
@@ -1000,9 +1000,9 @@ fn euclidean_floor_div(a: &RuntimeBigIntWitness, b_nat: &RuntimeBigNatWitness) -
                     requires a_val == -(qn * b_val);
                 assert(-qn == a_val / b_val) by (nonlinear_arith)
                     requires a_val == (-qn) * b_val, b_val > 0;
-                // out.model@ = model_from_sign_and_magnitude(true, q_nat.model@)
-                // If q_nat.model@ > 0: out.model@ = -(q_nat.model@ as int) = -qn
-                // If q_nat.model@ == 0: out.is_negative is false, out.model@ = 0 = -0
+                //  out.model@ = model_from_sign_and_magnitude(true, q_nat.model@)
+                //  If q_nat.model@ > 0: out.model@ = -(q_nat.model@ as int) = -qn
+                //  If q_nat.model@ == 0: out.is_negative is false, out.model@ = 0 = -0
                 if q_nat.model@ > 0 {
                     assert(out.model@ == -(q_nat.model@ as int));
                     assert(out.model@ == -qn);
@@ -1015,10 +1015,10 @@ fn euclidean_floor_div(a: &RuntimeBigIntWitness, b_nat: &RuntimeBigNatWitness) -
             }
             out
         } else {
-            // a < 0, remainder != 0: a / b = -(magnitude / b + 1)
-            // Because: a = -magnitude = -(q_nat * b + r_nat), r_nat > 0
-            //        = (-q_nat - 1) * b + (b - r_nat)
-            //   with 0 < b - r_nat < b, so Euclidean quotient = -q_nat - 1
+            //  a < 0, remainder != 0: a / b = -(magnitude / b + 1)
+            //  Because: a = -magnitude = -(q_nat * b + r_nat), r_nat > 0
+            //         = (-q_nat - 1) * b + (b - r_nat)
+            //    with 0 < b - r_nat < b, so Euclidean quotient = -q_nat - 1
             let one = RuntimeBigNatWitness::from_u32(1);
             let q_plus_one = q_nat.add(&one);
             let out = RuntimeBigIntWitness::from_sign_and_magnitude(true, q_plus_one);
@@ -1032,13 +1032,13 @@ fn euclidean_floor_div(a: &RuntimeBigIntWitness, b_nat: &RuntimeBigNatWitness) -
                 assert(mag == qn * b_nat.model@ + rn);
                 assert(rn > 0nat);
                 assert(rn < b_nat.model@);
-                // q_plus_one.model@ == qn + 1
+                //  q_plus_one.model@ == qn + 1
                 assert(q_plus_one.model@ == qn + 1);
                 let bn = b_nat.model@;
-                // Work in int to avoid nat subtraction issues
+                //  Work in int to avoid nat subtraction issues
                 let eq: int = -((qn as int) + 1);
                 let er: int = (bn as int) - (rn as int);
-                // a_val = eq * b_val + er
+                //  a_val = eq * b_val + er
                 assert(a_val == -(mag as int));
                 assert((mag as int) == (qn as int) * (bn as int) + (rn as int)) by (nonlinear_arith)
                     requires mag == qn * bn + rn;
@@ -1049,7 +1049,7 @@ fn euclidean_floor_div(a: &RuntimeBigIntWitness, b_nat: &RuntimeBigNatWitness) -
                         er == (bn as int) - (rn as int),
                         b_val == bn as int,
                 ;
-                // 0 < er < b_val
+                //  0 < er < b_val
                 assert(er > 0) by (nonlinear_arith)
                     requires (rn as int) > 0, (rn as int) < (bn as int), er == (bn as int) - (rn as int);
                 assert(er < b_val) by (nonlinear_arith)
@@ -1060,7 +1060,7 @@ fn euclidean_floor_div(a: &RuntimeBigIntWitness, b_nat: &RuntimeBigNatWitness) -
                         0 < er,
                         er < b_val,
                 ;
-                // out.model@
+                //  out.model@
                 assert(q_plus_one.model@ > 0nat);
                 assert(out.model@ == -((qn + 1) as int));
                 assert(out.model@ == eq) by (nonlinear_arith)
@@ -1071,7 +1071,7 @@ fn euclidean_floor_div(a: &RuntimeBigIntWitness, b_nat: &RuntimeBigNatWitness) -
     }
 }
 
-/// Floor dyadic: floor(r * 2^k) / 2^k.
+///  Floor dyadic: floor(r * 2^k) / 2^k.
 pub fn floor_dyadic_rational(r: &RuntimeRational, pow2_wit: &RuntimeBigNatWitness, Ghost(k): Ghost<nat>) -> (out: RuntimeRational)
     requires
         r.wf_spec(),
@@ -1082,13 +1082,13 @@ pub fn floor_dyadic_rational(r: &RuntimeRational, pow2_wit: &RuntimeBigNatWitnes
         out@ == floor_dyadic_spec(r@, k),
 {
     proof { crate::interval::lemma_pow2_positive(k); }
-    // scaled_num = r.numerator * pow2 (BigInt * BigNat → BigInt)
+    //  scaled_num = r.numerator * pow2 (BigInt * BigNat → BigInt)
     let pow2_signed = RuntimeBigIntWitness::from_unsigned(pow2_wit.copy_small_total());
     let scaled_num = r.numerator.mul(&pow2_signed);
-    // q = floor(scaled_num / r.denominator) using Euclidean division via BigNat
+    //  q = floor(scaled_num / r.denominator) using Euclidean division via BigNat
     let denom_copy = r.denominator.copy_small_total();
     let q = euclidean_floor_div(&scaled_num, &denom_copy);
-    // Build result: q / pow2
+    //  Build result: q / pow2
     let denom_out = pow2_wit.copy_small_total();
     let ghost model = floor_dyadic_spec(r@, k);
     proof {
@@ -1099,15 +1099,15 @@ pub fn floor_dyadic_rational(r: &RuntimeRational, pow2_wit: &RuntimeBigNatWitnes
             assert(model == Rational::from_frac_spec(
                 (r@.num * pow2) / r@.denom(), pow2));
         }
-        // q.model@ = (r.numerator.model@ * pow2) / (r.denominator.model@ as int)
+        //  q.model@ = (r.numerator.model@ * pow2) / (r.denominator.model@ as int)
         assert(scaled_num.model@ == r.numerator.model@ * (pow2_spec(k) as int));
         assert(q.model@ == scaled_num.model@ / (denom_copy.model@ as int));
-        // Need: q.model@ == model.num
-        // q.model@ = (nn * pow2) / D  where nn = r.numerator.model@, D = r.denominator.model@ as int
-        // model.num = (n * pow2) / d   where n = r@.num, d = r@.denom()
-        // From wf: nn * d == n * D with D > 0, d > 0
-        // Cross-multiplication: (nn * pow2) * d == (n * pow2) * D
-        // => (nn * pow2) / D == (n * pow2) / d
+        //  Need: q.model@ == model.num
+        //  q.model@ = (nn * pow2) / D  where nn = r.numerator.model@, D = r.denominator.model@ as int
+        //  model.num = (n * pow2) / d   where n = r@.num, d = r@.denom()
+        //  From wf: nn * d == n * D with D > 0, d > 0
+        //  Cross-multiplication: (nn * pow2) * d == (n * pow2) * D
+        //  => (nn * pow2) / D == (n * pow2) / d
         let nn = r.numerator.model@;
         let dd = r.denominator.model@ as int;
         let n = r@.num;
@@ -1131,7 +1131,7 @@ pub fn floor_dyadic_rational(r: &RuntimeRational, pow2_wit: &RuntimeBigNatWitnes
     }
 }
 
-/// Ceil dyadic: ceil(r * 2^k) / 2^k, via negate-floor-negate.
+///  Ceil dyadic: ceil(r * 2^k) / 2^k, via negate-floor-negate.
 pub fn ceil_dyadic_rational(r: &RuntimeRational, pow2_wit: &RuntimeBigNatWitness, Ghost(k): Ghost<nat>) -> (out: RuntimeRational)
     requires
         r.wf_spec(),
@@ -1147,23 +1147,23 @@ pub fn ceil_dyadic_rational(r: &RuntimeRational, pow2_wit: &RuntimeBigNatWitness
     let result = floor_neg.neg();
     proof {
         let pow2 = pow2_spec(k) as int;
-        // floor_neg@ == floor_dyadic_spec(neg_r@, k)
-        //            == floor_dyadic_spec(r@.neg_spec(), k)
-        //            == from_frac_spec((r@.neg_spec().num * pow2) / r@.neg_spec().denom(), pow2)
-        // neg_r@ = r@.neg_spec() = Rational { num: -r@.num, den: r@.den }
-        // So: floor_neg@.num = ((-r@.num) * pow2) / r@.denom()
-        //     floor_neg@.denom() = pow2
-        // result@ = floor_neg@.neg_spec()
-        //         = Rational { num: -floor_neg@.num, den: floor_neg@.den }
-        //         = from_frac_spec(-((-r@.num * pow2) / r@.denom()), pow2)
-        // Which matches ceil_dyadic_spec(r@, k) definition.
+        //  floor_neg@ == floor_dyadic_spec(neg_r@, k)
+        //             == floor_dyadic_spec(r@.neg_spec(), k)
+        //             == from_frac_spec((r@.neg_spec().num * pow2) / r@.neg_spec().denom(), pow2)
+        //  neg_r@ = r@.neg_spec() = Rational { num: -r@.num, den: r@.den }
+        //  So: floor_neg@.num = ((-r@.num) * pow2) / r@.denom()
+        //      floor_neg@.denom() = pow2
+        //  result@ = floor_neg@.neg_spec()
+        //          = Rational { num: -floor_neg@.num, den: floor_neg@.den }
+        //          = from_frac_spec(-((-r@.num * pow2) / r@.denom()), pow2)
+        //  Which matches ceil_dyadic_spec(r@, k) definition.
         assert(neg_r@ == r@.neg_spec());
         assert(neg_r@.num == -r@.num);
         assert(neg_r@.den == r@.den);
         assert(neg_r@.denom() == r@.denom());
         assert(floor_neg@ == floor_dyadic_spec(neg_r@, k));
         assert(result@ == floor_neg@.neg_spec());
-        // floor_dyadic_spec(neg_r@, k) = from_frac_spec((-r@.num * pow2) / r@.denom(), pow2)
+        //  floor_dyadic_spec(neg_r@, k) = from_frac_spec((-r@.num * pow2) / r@.denom(), pow2)
         let fd = floor_dyadic_spec(neg_r@, k);
         assert(fd == Rational::from_frac_spec((-r@.num * pow2) / r@.denom(), pow2));
         assert(fd.num == (-r@.num * pow2) / r@.denom()) by {
@@ -1172,10 +1172,10 @@ pub fn ceil_dyadic_rational(r: &RuntimeRational, pow2_wit: &RuntimeBigNatWitness
         assert(fd.den == (pow2 - 1) as nat) by {
             assert(pow2 > 0);
         }
-        // result@ = fd.neg_spec() = Rational { num: -fd.num, den: fd.den }
+        //  result@ = fd.neg_spec() = Rational { num: -fd.num, den: fd.den }
         assert(result@.num == -fd.num);
         assert(result@.den == fd.den);
-        // ceil_dyadic_spec(r@, k) = from_frac_spec(-((-r@.num * pow2) / r@.denom()), pow2)
+        //  ceil_dyadic_spec(r@, k) = from_frac_spec(-((-r@.num * pow2) / r@.denom()), pow2)
         let cd = ceil_dyadic_spec(r@, k);
         assert(cd.num == -((-r@.num * pow2) / r@.denom())) by {
             assert(pow2 > 0);
@@ -1191,7 +1191,7 @@ pub fn ceil_dyadic_rational(r: &RuntimeRational, pow2_wit: &RuntimeBigNatWitness
 }
 
 impl RuntimeInterval {
-    /// Reduce: snap endpoints to dyadic rationals with denominator 2^k.
+    ///  Reduce: snap endpoints to dyadic rationals with denominator 2^k.
     pub fn reduce(&self, k: u32) -> (out: Self)
         requires
             self.wf_spec(),
@@ -1203,7 +1203,7 @@ impl RuntimeInterval {
         self.reduce_with_pow2(&pow2_wit, Ghost(k as nat))
     }
 
-    /// Like `reduce`, but takes a precomputed 2^k witness to avoid rebuilding it.
+    ///  Like `reduce`, but takes a precomputed 2^k witness to avoid rebuilding it.
     pub fn reduce_with_pow2(&self, pow2_wit: &RuntimeBigNatWitness, Ghost(k): Ghost<nat>) -> (out: Self)
         requires
             self.wf_spec(),
@@ -1226,7 +1226,7 @@ impl RuntimeInterval {
         }
     }
 
-    /// Normalize: GCD-reduce both endpoints.
+    ///  Normalize: GCD-reduce both endpoints.
     pub fn normalize(&self) -> (out: Self)
         requires
             self.wf_spec(),
@@ -1239,7 +1239,7 @@ impl RuntimeInterval {
         let hi = self.hi.normalize();
         let ghost model = Interval { lo: lo@, hi: hi@ };
         proof {
-            // wf: lo@ <= hi@ follows from lo@ eqv self@.lo, hi@ eqv self@.hi, self@.lo <= self@.hi
+            //  wf: lo@ <= hi@ follows from lo@ eqv self@.lo, hi@ eqv self@.hi, self@.lo <= self@.hi
             Rational::lemma_eqv_symmetric(lo@, self@.lo);
             verus_algebra::lemmas::ordered_ring_lemmas::lemma_le_congruence_left::<Rational>(
                 self@.lo, lo@, self@.hi);
@@ -1254,4 +1254,4 @@ impl RuntimeInterval {
     }
 }
 
-} // verus!
+} //  verus!
